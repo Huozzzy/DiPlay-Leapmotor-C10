@@ -39,6 +39,7 @@ internal class BydHudRouteState(private val nanoTime: () -> Long = System::nanoT
     private var remainingSeconds: Long? = null
     private var remainingMeters: Long? = null
     private var emptyListSinceNs: Long? = null
+    private var lastRouteUpdateNs: Long? = null
 
     fun accept(messageId: Int, payload: ByteArray): BydHudRouteChange {
         if (!validTlvs(payload)) return BydHudRouteChange.NONE
@@ -80,12 +81,15 @@ internal class BydHudRouteState(private val nanoTime: () -> Long = System::nanoT
         remainingSeconds = null
         remainingMeters = null
         emptyListSinceNs = null
+        lastRouteUpdateNs = null
         maneuvers.clear()
         return wasActive
     }
 
     private fun activeManeuver(): Maneuver? {
         if (!routeActive || activeIndex < 0) return null
+        val updated = lastRouteUpdateNs ?: return null
+        if (nanoTime() - updated >= STALE_ROUTE_NS) return null
         val emptySince = emptyListSinceNs
         if (emptySince != null && nanoTime() - emptySince >= EMPTY_LIST_HIDE_NS) return null
         return maneuvers[activeIndex]
@@ -95,6 +99,7 @@ internal class BydHudRouteState(private val nanoTime: () -> Long = System::nanoT
     private fun roadFor(maneuver: Maneuver): String = maneuver.afterRoad.ifEmpty { currentRoad }
 
     private fun parseRouteUpdate(data: ByteArray): BydHudRouteChange {
+        lastRouteUpdateNs = nanoTime()
         var state: Int? = null
         var distance: Int? = null
         var firstManeuver: Int? = null
@@ -196,6 +201,7 @@ internal class BydHudRouteState(private val nanoTime: () -> Long = System::nanoT
         const val ROUTE_GUIDANCE_UPDATE = 0x5201
         const val ROUTE_GUIDANCE_MANEUVER_UPDATE = 0x5202
         private const val TLV_HEADER_BYTES = 4
+        private const val STALE_ROUTE_NS = 30_000_000_000L
         private const val EMPTY_LIST_HIDE_NS = 3_000_000_000L
     }
 }

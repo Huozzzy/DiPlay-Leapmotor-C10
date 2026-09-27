@@ -21,6 +21,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.TimeUnit
 
 /**
  * Android rendering backend for the CarPlay media engine. Video frames are
@@ -35,6 +38,7 @@ class AndroidMediaSink(
     private val advancedAudioChannelMapping: Boolean = false,
     onScreenStreamActiveChanged: ((Int, Boolean) -> Unit)? = null,
     private val mediaBufferMillis: Int = MediaAudioBuffer.DEFAULT_MILLIS,
+    private val onAudioDiagnostic: (String) -> Unit = {},
 ) : MediaSink {
     private val screenStateLock = Any()
     private val activeScreenTypes = mutableSetOf<Int>()
@@ -168,7 +172,7 @@ class AndroidMediaSink(
         val existing = audioRenderers[type]
         if (existing?.format == format) return existing
         existing?.close()
-        return AudioRenderer(format, advancedAudioChannelMapping, mediaBufferMillis).also { audioRenderers[type] = it }
+        return AudioRenderer(format, advancedAudioChannelMapping, mediaBufferMillis, onAudioDiagnostic).also { audioRenderers[type] = it }
     }
 }
 
@@ -230,7 +234,7 @@ private class VideoDecoder(
                         null -> Unit
                     }
                     decoder?.let(::drainOutput)
-                    stats.logIfDue()
+                    stats.logIfDue()?.let(report)
                     if (referenceChain.needsKeyFrame && lastConfig != null && outputSurface != null) requestKeyFrameIfDue()
                 } catch (error: Exception) {
                     if (running) Log.e(TAG, "video decoder job failed: ${job?.javaClass?.simpleName}", error)
@@ -392,9 +396,8 @@ private class VideoDecoder(
         Log.w(TAG, "Video recovery: $reason; waiting for keyframe")
         stats.onRecovery()
         report("recovery: $reason; waiting for keyframe")
-        // Flushing keeps the configured codec; recreating it at 2K+ adds a visible stall on every Wi-Fi burst.
-        val codec = decoder
-        if (codec == null || runCatching { codec.flush() }.isFailure) releaseDecoder()
+        // Recreate with codec-specific data: flush can discard CSD before the first output.
+        releaseDecoder()
         referenceChain.reset()
         requestKeyFrameIfDue()
     }
@@ -492,6 +495,7 @@ private class AudioRenderer(
     val format: AudioFormat,
     private val advancedAudioChannelMapping: Boolean,
     private val mediaBufferMillis: Int,
+    private val report: (String) -> Unit,
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int)
 
@@ -513,11 +517,18 @@ private class AudioRenderer(
     private var inputDropped = 0
     private var outputBuffers = 0
     private var firstPcmLogged = false
-    @Volatile private var packetsReceived = 0
-    @Volatile private var packetsDropped = 0
+    private val packetsReceived = AtomicInteger()
+    private val packetsDropped = AtomicInteger()
+    private val lastArrivalNs = AtomicLong()
+    private val maxArrivalGapMs = AtomicLong()
+    private var maxWriteMs = 0L
     private var statsWindowStartNs = 0L
     private var statsLastUnderruns = 0
     private var bytesPerSecond = 0
+    private val bufferProgress = AudioBufferProgress(if (format.channels >= 2) 4 else 2)
+    private var underrunsAtPlaybackStart = 0
+    private var lastPcmWriteNs = 0L
+    private var rebufferCount = 0
     private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
 
     fun start() {
@@ -527,12 +538,18 @@ private class AudioRenderer(
     }
 
     fun submit(rtp: ByteArray, sample: Int) {
-        if (started) packetsReceived++
+        if (started) {
+            packetsReceived.incrementAndGet()
+            val now = System.nanoTime()
+            val previous = lastArrivalNs.getAndSet(now)
+            if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
+        }
         if (!started || !queue.offer(AudioPacket(rtp, sample))) {
-            if (started) packetsDropped++
+            if (started) packetsDropped.incrementAndGet()
             if (started && !droppedPacketsLogged) {
                 droppedPacketsLogged = true
                 Log.w(TAG, "audio queue full; dropping newest packets to bound latency")
+                report("Audio: queue full audioType=${format.audioType}")
             }
         }
     }
@@ -551,14 +568,22 @@ private class AudioRenderer(
             }
             createTrack()
             while (running) {
-                handle(queue.take())
+                queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS)?.let(::handle)
+                // Output becomes ready asynchronously, including after the last packet of a burst.
+                // Waiting for the next UDP packet can strand decoded sound for hundreds of ms.
+                codec?.let(::drainCodec)
+                maintainPlaybackBuffer()
                 logStatsIfDue()
             }
         } catch (_: InterruptedException) {
             // Worker shut down.
         } catch (error: Exception) {
-            if (running) Log.e(TAG, "audio renderer worker failed", error)
+            if (running) {
+                Log.e(TAG, "audio renderer worker failed", error)
+                report("Audio: renderer failed audioType=${format.audioType} error=${error.javaClass.simpleName}")
+            }
         } finally {
+            runCatching { logStatsIfDue(force = true) }
             release()
         }
     }
@@ -624,6 +649,9 @@ private class AudioRenderer(
         track = built
         val capacityBytes = built.bufferSizeInFrames * frameBytes
         startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes, PREBUFFER_WRITE_CHUNK_BYTES)
+        report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
+            "rate=${format.sampleRate} channels=${format.channels} " +
+            "bufferMs=${capacityBytes * 1000L / bytesPerSecond} startMs=${startThresholdBytes * 1000L / bytesPerSecond}")
         Log.i(
             TAG,
             "audio track prepared type=${format.payloadType} audioType=${format.audioType} " +
@@ -845,36 +873,63 @@ private class AudioRenderer(
             } else {
                 minOf(length - written, PREBUFFER_WRITE_CHUNK_BYTES)
             }
+            val writeStarted = System.nanoTime()
             val count = track.write(data, offset + written, writeLength, AudioTrack.WRITE_BLOCKING)
+            maxWriteMs = maxOf(maxWriteMs, (System.nanoTime() - writeStarted) / 1_000_000L)
             if (count <= 0) break
             written += count
+            bufferProgress.written(count)
+            lastPcmWriteNs = System.nanoTime()
             if (!playbackStarted) {
                 prebufferBytes += count
                 if (prebufferBytes >= startThresholdBytes) {
-                    track.play()
-                    playbackStarted = true
+                    startPlayback(track)
                     Log.i(TAG, "audio playback started type=${format.payloadType}")
                 }
             }
         }
     }
 
-    // One line per 5 s while audio flows, so a drive log shows whether music gaps come from the network.
-    private fun logStatsIfDue() {
+    private fun startPlayback(track: AudioTrack) {
+        underrunsAtPlaybackStart = track.underrunCount
+        track.play()
+        playbackStarted = true
+    }
+
+    private fun maintainPlaybackBuffer() {
+        val track = track ?: return
+        if (bufferProgress.shouldRebuffer(format.audioType, playbackStarted,
+                track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition)) {
+            // The hardware buffer has actually drained. Pause without flushing or discarding PCM,
+            // then use the configured start threshold again when music resumes.
+            track.pause()
+            playbackStarted = false
+            prebufferBytes = 0
+            rebufferCount++
+        }
+        // A short final burst may never reach the start threshold. Play it after a bounded wait.
+        if (!playbackStarted && prebufferBytes > 0 && queue.isEmpty() &&
+            System.nanoTime() - lastPcmWriteNs >= BUFFER_TAIL_WAIT_NS) {
+            startPlayback(track)
+        }
+    }
+
+    // Persist counters even during packet starvation, and flush before disconnect releases the track.
+    private fun logStatsIfDue(force: Boolean = false) {
         val now = System.nanoTime()
         if (statsWindowStartNs == 0L) statsWindowStartNs = now
-        if (now - statsWindowStartNs < STATS_WINDOW_NS) return
-        val track = track
+        if (!force && now - statsWindowStartNs < STATS_WINDOW_NS) return
         val underruns = track?.underrunCount ?: 0
-        Log.i(
-            STATS_TAG,
-            "audio stats audioType=${format.audioType} codec=${format.codec} rx=$packetsReceived " +
-                "dropped=$packetsDropped underruns=+${underruns - statsLastUnderruns} queue=${queue.size} " +
-                "playing=$playbackStarted",
-        )
+        val lastRx = lastArrivalNs.get()
+        val line = "audio stats audioType=${format.audioType} codec=${format.codec} rx=${packetsReceived.getAndSet(0)} " +
+            "dropped=${packetsDropped.getAndSet(0)} underruns=+${underruns - statsLastUnderruns} queue=${queue.size} " +
+            "playing=$playbackStarted maxGapMs=${maxArrivalGapMs.getAndSet(0)} " +
+            "sinceRxMs=${if (lastRx == 0L) -1 else (now - lastRx) / 1_000_000L} maxWriteMs=$maxWriteMs " +
+            "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount ended=$force"
+        Log.i(STATS_TAG, line)
+        report(line)
         statsLastUnderruns = underruns
-        packetsReceived = 0
-        packetsDropped = 0
+        maxWriteMs = 0L
         statsWindowStartNs = now
     }
 
@@ -943,6 +998,8 @@ private class AudioRenderer(
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
         const val OPUS_SEEK_PRE_ROLL_NANOS = 80_000_000L
         const val INPUT_TIMEOUT_US = 10_000L
+        const val AUDIO_POLL_MILLIS = 10L
+        const val BUFFER_TAIL_WAIT_NS = 500_000_000L
         // Holds a burst after a Wi-Fi gap (~4 s of AAC) instead of dropping it.
         const val MAX_QUEUED_PACKETS = 192
         const val PREBUFFER_WRITE_CHUNK_BYTES = 2 * 1024

@@ -27,14 +27,14 @@ import com.shilapi.xcertplay.airplay.AirPlayMediaHandler
 import com.shilapi.xcertplay.airplay.AirPlaySession
 import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.PairingStore
-import com.shilapi.xcertplay.hud.BydClusterBridge
-import com.shilapi.xcertplay.hud.BydHudBridge
+import com.shilapi.xcertplay.hud.BydNavigationOutputs
 import com.shilapi.xcertplay.iap2.session.Iap2Session
 import com.shilapi.xcertplay.mfi.Iap2MfiAuthenticationClient
 import com.shilapi.xcertplay.mfi.MfiAuthenticationClient
 import com.shilapi.xcertplay.mfi.RemoteMfiAuthenticationClient
 import com.shilapi.xcertplay.mfi.LocalMfiAuthenticationClient
 import com.shilapi.xcertplay.network.CarPlayBonjour
+import com.shilapi.xcertplay.network.diagnosticSummary
 import com.shilapi.xcertplay.network.CarPlayVpnService
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
 import com.shilapi.xcertplay.network.ManualHotspotManager
@@ -148,8 +148,7 @@ class CarPlayController(
         require(!config.locationReportingEnabled || locationProvider != null) {
             "A location provider is required when location reporting is enabled"
         }
-        BydHudBridge.initialize(context.applicationContext)
-        BydClusterBridge.initialize(context.applicationContext)
+        BydNavigationOutputs.start(context.applicationContext)
     }
 
     private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, DATAPATHS, CONTROL }
@@ -225,6 +224,7 @@ class CarPlayController(
 
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
+            if (activeSession !== session) BydNavigationOutputs.start(appContext)
             activeSession = session
             debugLog(
                 "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
@@ -236,8 +236,7 @@ class CarPlayController(
         override fun onSessionEnded(session: AirPlaySession) {
             if (activeSession === session) {
                 activeSession = null
-                BydHudBridge.clear()
-                BydClusterBridge.clear()
+                BydNavigationOutputs.endNow()
             }
             debugLog("AirPlay session ended peer=${session.host}")
             uiListener?.onSessionEnded(session)
@@ -358,6 +357,7 @@ class CarPlayController(
             if (closed) return
             closed = true
         }
+        BydNavigationOutputs.endNow()
         closeReceivers()
         availabilityPollGeneration.incrementAndGet()
         wirelessGeneration.incrementAndGet()
@@ -415,8 +415,7 @@ class CarPlayController(
 
     // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
-        runCatching { BydHudBridge.onFrame(frame) }.onFailure { debugLog("BYD HUD frame failed: $it") }
-        runCatching { BydClusterBridge.onFrame(frame) }.onFailure { debugLog("BYD cluster frame failed: $it") }
+        BydNavigationOutputs.onFrame(frame)
     }
 
     private fun startMfi() {
@@ -820,6 +819,8 @@ class CarPlayController(
             debugLog(
                 "wireless hotspot backend=${hotspotInfo.backend.label} " +
                     "iface=${hotspotInfo.interfaceName ?: "unknown"} " +
+                    "family=${if (hostAddress is Inet6Address) "IPv6" else "IPv4"} " +
+                    "identitySource=${if (deviceIdentifier == hotspotInfo.bssid) "interface" else "saved"} " +
                     "host=$hostAddressText " +
                     "band=${hotspotInfo.bandLabel} channel=${hotspotInfo.channel} " +
                     "frequency=${hotspotInfo.frequencyMHz?.toString() ?: "unknown"}MHz",
@@ -884,12 +885,15 @@ class CarPlayController(
                 config = wirelessAirPlayConfig,
                 identity = identity,
                 advertisedHost = hostAddress.hostAddress,
-                useInterfaceMdns = hotspotInfo.backend == WirelessHotspotBackend.WIFI_P2P,
-                onEvent = { event -> debugLog("wireless bonjour: $event") },
+                // Bind discovery and its connect probe to the same AP/address family as AirPlay.
+                // The car hotspot previously used system NSD, which could resolve another interface
+                // or IPv6 while the listener/probe was bound to the AP's IPv4 address.
+                useInterfaceMdns = true,
+                onEvent = { event -> debugLog("wireless bonjour: ${event.diagnosticSummary()}") },
             )
             bonjour = bonjourClient
             bonjourClient.start()
-            debugLog("wireless Bonjour services started")
+            debugLog("wireless Bonjour services started mode=interface iface=${hotspotInfo.interfaceName ?: "unknown"}")
             if (isStaleWirelessRun(generation)) {
                 closeWirelessStack()
                 return
@@ -1553,6 +1557,7 @@ class CarPlayController(
                 band = config.manualHotspotBand,
                 channel = config.manualHotspotChannel,
                 security = config.manualHotspotSecurity,
+                onDiagnostic = ::debugLog,
             )
         }
         hotspot = manager

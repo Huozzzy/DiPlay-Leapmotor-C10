@@ -2765,17 +2765,24 @@ class CarPlayHostActivity : ComponentActivity() {
         videoWidth: Int,
         videoHeight: Int,
         controllerGeneration: Int,
-    ): AndroidMediaSink = AndroidMediaSink(
-        surface = null,
-        videoWidth = videoWidth,
-        videoHeight = videoHeight,
-        preferSoftwareHevcDecoder = hevcSoftwareDecoderEnabled,
-        advancedAudioChannelMapping = advancedAudioChannelMapping,
-        onScreenStreamActiveChanged = { type, active ->
-            onScreenStreamStateChanged(controllerGeneration, type, active)
-        },
-        mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
-    )
+    ): AndroidMediaSink {
+        // Capture this session's log: late decoder shutdown must not write into a new session.
+        val diagnosticLog = sessionLog
+        return AndroidMediaSink(
+            surface = null,
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            preferSoftwareHevcDecoder = hevcSoftwareDecoderEnabled,
+            advancedAudioChannelMapping = advancedAudioChannelMapping,
+            onScreenStreamActiveChanged = { type, active ->
+                onScreenStreamStateChanged(controllerGeneration, type, active)
+            },
+            mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
+            onAudioDiagnostic = { message ->
+                diagnosticLog?.append(formattedLogLine(message, System.currentTimeMillis()))
+            },
+        )
+    }
 
     private fun createMediaEngine(sink: AndroidMediaSink): CarPlayMediaEngine =
         CarPlayMediaEngine(

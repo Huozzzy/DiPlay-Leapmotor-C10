@@ -125,6 +125,24 @@ class BydHudRouteStateTest {
         assertEquals(26, guidance.gaode)
     }
 
+    @Test
+    fun `silent route expires and fresh update restores cached maneuver`() {
+        var now = 0L
+        val state = populatedState { now }
+        now = 30_000_000_000L
+        assertNull(state.current())
+        state.accept(BydHudRouteState.ROUTE_GUIDANCE_UPDATE, tlvs(tlv(0x0a, 0, 0, 0, 20)))
+        assertEquals(20, state.current()!!.distanceMeters)
+    }
+
+    @Test
+    fun `clear prevents a keepalive from restoring guidance`() {
+        val state = populatedState()
+        state.clear()
+        assertNull(state.current())
+        assertNull(state.currentApple())
+    }
+
     private fun utf8z(value: String): IntArray =
         (value.toByteArray(Charsets.UTF_8).map { it.toInt() and 0xff } + 0).toIntArray()
 

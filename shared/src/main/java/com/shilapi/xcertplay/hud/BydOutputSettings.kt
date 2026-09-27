@@ -16,7 +16,7 @@ object BydOutputSettings {
 
     /** Whether the head unit has a BYD navigation receiver, so settings can hide a switch that cannot work. */
     fun available(context: Context): Boolean =
-        installed(context, "com.byd.amapservice") || installed(context, "com.ts.car.someip.service")
+        BydStandaloneHudOutput.available(context) || installed(context, "com.byd.amapservice") || installed(context, "com.ts.car.someip.service")
 
     private fun installed(context: Context, pkg: String): Boolean =
         runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess

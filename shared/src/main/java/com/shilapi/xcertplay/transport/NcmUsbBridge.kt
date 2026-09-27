@@ -112,12 +112,13 @@ class NcmUsbBridge internal constructor(
 
     override fun close() {
         statusRunning.set(false)
-        synchronized(stateLock) {
+        val requestToClose = synchronized(stateLock) {
             if (closed) return
             closed = true
+            readRequest
         }
         // Wakes a reader blocked in requestWait(); it then observes the closed state.
-        runCatching { readRequest?.cancel() }
+        runCatching { requestToClose?.cancel() }
         statusThread?.let { thread ->
             thread.interrupt()
             try {
@@ -134,7 +135,7 @@ class NcmUsbBridge internal constructor(
             }
         }
         connection.close()
-        runCatching { readRequest?.close() }
+        runCatching { requestToClose?.close() }
     }
 
     private fun drainStatus(endpoint: UsbEndpoint) {
@@ -219,22 +220,27 @@ class NcmUsbBridge internal constructor(
     private fun readChunk(timeoutMillis: Long): Int? {
         checkOpen()
         val request = try {
-            readRequest ?: UsbRequest().also {
-                if (!it.initialize(connection, inEndpoint)) {
-                    it.close()
-                    throw failSession("Android could not initialize the NCM read request")
+            // Publish and queue atomically with close(), so detach cannot miss a new request.
+            synchronized(stateLock) {
+                checkOpenLocked()
+                val current = readRequest ?: UsbRequest().also {
+                    if (!it.initialize(connection, inEndpoint)) {
+                        it.close()
+                        throw failSession("Android could not initialize the NCM read request")
+                    }
+                    readRequest = it
                 }
-                readRequest = it
+                if (!readQueued) {
+                    directReadBuffer.clear()
+                    if (!current.queue(directReadBuffer)) throw failSession("Android could not queue the NCM read request")
+                    readQueued = true
+                }
+                current
             }
         } catch (error: RuntimeException) {
             throw failSession("NCM read failed", error)
         }
         try {
-            if (!readQueued) {
-                directReadBuffer.clear()
-                if (!request.queue(directReadBuffer)) throw failSession("Android could not queue the NCM read request")
-                readQueued = true
-            }
             val completed = try {
                 connection.requestWait(timeoutMillis.coerceAtLeast(1))
             } catch (_: TimeoutException) {

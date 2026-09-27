@@ -64,7 +64,7 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.initialize(applicationContext)
+        com.shilapi.xcertplay.hud.BydNavigationOutputs.onAppOpened(applicationContext)
         WindowCompat.setDecorFitsSystemWindows(window, true)
         window.statusBarColor = BG; window.navigationBarColor = BG
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -222,7 +222,7 @@ class DiPlayActivity : ComponentActivity() {
         }
         if (com.shilapi.xcertplay.hud.BydOutputSettings.available(this)) section(content, "BYD navigation") { card ->
             toggle(card, "Navigation on HUD and instrument cluster",
-                "Arrow, distance, street and arrival time from Apple Maps on the windshield and the instrument cluster.",
+                "Show phone navigation arrows, distance and street names on supported BYD displays. Vehicle compatibility varies.",
                 com.shilapi.xcertplay.hud.BydOutputSettings.enabled(this)) { com.shilapi.xcertplay.hud.BydOutputSettings.setEnabled(this, it) }
         }
         section(content, "Permissions and connection help") { card ->

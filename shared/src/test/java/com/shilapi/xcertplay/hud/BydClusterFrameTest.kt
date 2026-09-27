@@ -31,6 +31,11 @@ class BydClusterFrameTest {
         assertEquals(0, frame(type = 1, distance = -5).distanceMeters)
     }
 
+    @Test fun `unknown maneuver is not advertised as straight`() {
+        for (type in listOf(0, 15, 16, 17, 54, 255)) assertEquals(0, frame(type).icon)
+        for (type in listOf(3, 5, 8, 9, 11, 51)) assertEquals(9, frame(type).icon)
+    }
+
     private fun frame(type: Int, distance: Int = 0, drivingSide: Int = 0) =
         BydClusterFrame.from(BydAppleManeuver(distance, type, drivingSide))
 }

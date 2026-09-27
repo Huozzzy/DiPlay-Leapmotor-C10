@@ -10,13 +10,13 @@ internal object BydHudPayload {
     fun guidance(
         distanceMeters: Int,
         maneuver: Int,
-        sequence: Int,
         icon: ByteArray? = null,
         road: String = "",
         eta: String = "",
     ): ByteArray =
         ByteArrayOutputStream(64 + (icon?.size ?: 0)).apply {
-            field(2, (sequence and 0xff).toLong())
+            // HUD experiment A: match the fixed guidance value observed by BYDMate.
+            field(2, 2)
             field(6, 1)
             bytes(7, ByteArray(0))
             bytes(8, icon ?: ByteArray(0))

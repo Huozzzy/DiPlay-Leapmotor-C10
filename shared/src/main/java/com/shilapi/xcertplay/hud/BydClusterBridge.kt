@@ -20,14 +20,13 @@ internal object BydClusterBridge {
     private const val KEY_STATE = 10019
     private const val STATE_ENDED = 9
     private const val KEEPALIVE_TICKS = 5
-    private const val MARKER_PREFS = "diplay_byd_cluster_state"
-    private const val KEY_GUIDANCE_ACTIVE = "guidance_active"
     private const val FLAG_RECEIVER_INCLUDE_BACKGROUND = 0x01000000 // hidden Intent flag, as sent by stock clients
 
     private val lock = Any()
     private val route = BydHudRouteState()
     private var context: Context? = null
     private var available = false
+    private var factory: BydFactoryNavigationOutput? = null
     private var senderStarted = false
     private var lastSent: BydClusterFrame? = null
     private var ticksSinceSend = 0
@@ -42,13 +41,11 @@ internal object BydClusterBridge {
         } catch (_: PackageManager.NameNotFoundException) {
             false
         }
-        Log.i(TAG, "cluster adapter available=$available")
-        // A swipe from recents force-stops DiPlay before it can end guidance; the adapter would keep
-        // showing the last arrow indefinitely, so end what a previous process left behind.
-        if (available && guidanceMarker(appContext)) {
-            Log.i(TAG, "ending guidance left by a previous DiPlay process")
-            sendEndLocked()
+        if (!available && appContext.packageName.endsWith(".hudtest")) {
+            factory = BydFactoryNavigationOutput(appContext.applicationContext)
+            available = true
         }
+        Log.i(TAG, "cluster adapter available=$available factoryTest=${factory != null}")
         if (available && !senderStarted) {
             senderStarted = true
             Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -66,14 +63,9 @@ internal object BydClusterBridge {
         }
     }
 
-    /** Ends cluster guidance immediately; called when DiPlay is about to be killed. */
-    fun endNow() = synchronized(lock) {
-        if (available && lastSent != null) sendEndLocked()
-    }
-
     fun clear() = synchronized(lock) {
-        // Only end guidance we started, so a stock navigation session is never cut off.
-        if (available && route.clear() && lastSent != null) sendEndLocked()
+        route.clear() // Prevent the keepalive from restoring guidance after cleanup.
+        if (available && lastSent != null) sendEndLocked()
     }
 
     private fun tick() = synchronized(lock) {
@@ -93,6 +85,12 @@ internal object BydClusterBridge {
             return
         }
         if (!force && frame == lastSent) return
+        factory?.let {
+            it.update(frame.icon, frame.roundaboutExit, frame.distanceMeters)
+            lastSent = frame
+            ticksSinceSend = 0
+            return
+        }
         val intent = baseIntent(KEY_GUIDANCE).apply {
             putExtra("TYPE", 0)
             putExtra("EXTRA_STATE", 0)
@@ -105,7 +103,6 @@ internal object BydClusterBridge {
             putExtra("ROUTE_REMAIN_TIME", frame.routeRemainingSeconds)
         }
         if (broadcastLocked(intent)) {
-            if (lastSent == null) context?.let { setGuidanceMarker(it, true) }
             lastSent = frame
             ticksSinceSend = 0
             if (!guidanceLogged) {
@@ -116,6 +113,12 @@ internal object BydClusterBridge {
     }
 
     private fun sendEndLocked() {
+        factory?.let {
+            it.clear()
+            lastSent = null
+            guidanceLogged = false
+            return
+        }
         val intent = baseIntent(KEY_STATE).apply {
             putExtra("EXTRA_STATE", STATE_ENDED)
             putExtra("EXTRA_IS_FOREGROUND", 1)
@@ -125,19 +128,11 @@ internal object BydClusterBridge {
             putExtra("ROUTE_REMAIN_DIS", -1)
             putExtra("ROUTE_REMAIN_TIME", -1)
         }
-        broadcastLocked(intent)
-        context?.let { setGuidanceMarker(it, false) }
+        if (!broadcastLocked(intent)) return
         lastSent = null
         guidanceLogged = false
         Log.i(TAG, "cluster guidance ended")
     }
-
-    private fun guidanceMarker(context: Context): Boolean =
-        context.getSharedPreferences(MARKER_PREFS, Context.MODE_PRIVATE).getBoolean(KEY_GUIDANCE_ACTIVE, false)
-
-    private fun setGuidanceMarker(context: Context, active: Boolean) =
-        context.getSharedPreferences(MARKER_PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_GUIDANCE_ACTIVE, active).apply()
 
     // IS_BYD_MAP=true is required: the adapter drops foreign frames while it believes the stock map navigates.
     private fun baseIntent(keyType: Int) = Intent(AMAP_ACTION).apply {

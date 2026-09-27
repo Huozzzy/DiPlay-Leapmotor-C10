@@ -48,7 +48,8 @@ internal data class BydClusterFrame(
                 6 -> if (leftHandTraffic) ROUNDABOUT_ENTER_CLOCKWISE else ROUNDABOUT_ENTER
                 7 -> if (leftHandTraffic) ROUNDABOUT_EXIT_CLOCKWISE else ROUNDABOUT_EXIT
                 10, 12, 24, 25, 27 -> DESTINATION
-                else -> STRAIGHT
+                3, 5, 8, 9, 11, 51 -> STRAIGHT
+                else -> 0 // Unknown/no maneuver must not become a false straight arrow.
             }
             return BydClusterFrame(icon, 0, distance, road, remainingMeters, remainingSeconds)
         }

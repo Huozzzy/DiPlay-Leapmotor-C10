@@ -20,23 +20,26 @@ internal object BydHudBridge {
     private const val SOMEIP_ACTION = "com.ts.car.someip.SomeIpServerService"
     private const val SOMEIP_TOKEN = "ts.car.someip.sdk.ISomeIpServerInterface"
     private const val CALLBACK_TOKEN = "ts.car.someip.sdk.ISomeIpCallback"
-    private const val SERVICE_ID = 0x000B010A00010000L
-    private const val HUD_TOPIC = 0x0004010A00018001L
+    private const val SERVICE_ID = BydHudProtocol.SERVICE_TOPIC
+    private const val HUD_TOPIC = BydHudProtocol.NAVIGATION_TOPIC
     private const val TX_REGISTER_CALLBACK = 1
     private const val TX_START_SERVICE = 4
     private const val TX_FIRE_EVENT = 6
     private const val ICON_ASSET_DIR = "byd-hud-icons"
 
+    private val callbacks = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "diplay-hud-callback").apply { isDaemon = true }
+    }
     private val lock = Any()
     private val route = BydHudRouteState()
     private var context: Context? = null
     private var binder: IBinder? = null
     private var binding = false
     private var started = false
-    private var sequence = 0
     private var senderStarted = false
     private var guidanceSentLogged = false
     private var showing = false
+    private var lastSendResult: Int? = null
     private var icons: Map<Int, ByteArray>? = null
 
     // The gateway pings registered callbacks and drops registrations that do not answer like an AIDL stub.
@@ -47,6 +50,20 @@ internal object BydHudBridge {
                 data.enforceInterface(CALLBACK_TOKEN)
                 reply?.writeNoException()
                 reply?.writeInt(0)
+                true
+            }
+            FIRST_CALL_TRANSACTION + 1 -> {
+                data.enforceInterface(CALLBACK_TOKEN)
+                val ready = data.readInt() != 0
+                Log.i(TAG, "SOME/IP HAL ready=$ready")
+                reply?.writeNoException()
+                true
+            }
+            FIRST_CALL_TRANSACTION + 2 -> {
+                data.enforceInterface(CALLBACK_TOKEN)
+                reply?.writeNoException()
+                reply?.writeInt(0) // No response to an unsupported request.
+                reply?.writeInt(0) // No modified input parcel.
                 true
             }
             else -> super.onTransact(code, data, reply, flags)
@@ -60,7 +77,7 @@ internal object BydHudBridge {
             senderStarted = true
             Executors.newSingleThreadScheduledExecutor { runnable ->
                 Thread(runnable, "diplay-byd-hud").apply { isDaemon = true }
-            }.scheduleAtFixedRate(::tick, 1, 1, TimeUnit.SECONDS)
+            }.scheduleWithFixedDelay(::tick, BydHudProtocol.REPEAT_MILLIS, BydHudProtocol.REPEAT_MILLIS, TimeUnit.MILLISECONDS)
         }
     }
 
@@ -79,10 +96,11 @@ internal object BydHudBridge {
     }
 
     /** Clears the HUD immediately; called when DiPlay is about to be killed. */
-    fun clearNow() = synchronized(lock) { clearHudLocked() }
+    fun clearNow() = clear()
 
     fun clear() = synchronized(lock) {
-        if (route.clear()) clearHudLocked()
+        route.clear()
+        clearHudLocked()
     }
 
     private fun tick() = synchronized(lock) {
@@ -106,20 +124,20 @@ internal object BydHudBridge {
         val payload = BydHudPayload.guidance(
             distanceMeters = guidance.distanceMeters,
             maneuver = guidance.maneuver,
-            sequence = sequence++ and 0xff,
             icon = iconFor(guidance.gaode),
             road = guidance.road,
         )
-        if (sendLocked(payload) && !guidanceSentLogged) {
+        val accepted = sendLocked(payload)
+        if (accepted && !guidanceSentLogged) {
             guidanceSentLogged = true
-            Log.i(TAG, "HUD guidance accepted $guidance")
+            Log.i(TAG, "HUD profile (300ms repeat, fixed field2=2): gateway accepted guidance; rendering unconfirmed")
         }
-        showing = true
+        if (accepted) showing = true
     }
 
     private fun clearHudLocked() {
         if (!showing) return
-        sendLocked(BydHudPayload.clear())
+        if (!sendLocked(BydHudPayload.clear())) return
         showing = false
         guidanceSentLogged = false
     }
@@ -158,38 +176,47 @@ internal object BydHudBridge {
         }
     }
 
+    private fun onGatewayCallback(action: () -> Unit) {
+        callbacks.execute {
+            synchronized(lock) {
+                runCatching(action).onFailure { Log.w(TAG, "gateway callback failed", it) }
+            }
+        }
+    }
+
     private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, service: IBinder) = synchronized(lock) {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) = onGatewayCallback {
             binder = service
             binding = true
-            // Also runs after a gateway restart: its registrations and started services are gone.
-            val registered = transactLocked(TX_REGISTER_CALLBACK) { it.writeStrongBinder(callback) }
-            started = transactLocked(TX_START_SERVICE) { it.writeLong(SERVICE_ID) } >= 0
-            Log.i(TAG, "SOME/IP connected, callback=$registered started=$started")
+            val registered = transactLocked(TX_REGISTER_CALLBACK, returnsValue = false) { it.writeStrongBinder(callback) }
+            val startResult = if (registered == 0) transactLocked(TX_START_SERVICE) { it.writeLong(SERVICE_ID) } else -1
+            // Firmware explicitly treats 13 as an already-started service.
+            started = BydHudProtocol.serviceStarted(startResult)
+            Log.i(TAG, "SOME/IP connected, callback=$registered startResult=$startResult started=$started")
             showing = false
             sendCurrentLocked()
         }
 
-        // The binding stays registered and BIND_AUTO_CREATE reconnects; binding again would leak a connection.
-        override fun onServiceDisconnected(name: ComponentName) = synchronized(lock) {
+        // BIND_AUTO_CREATE reconnects after a gateway restart without a second binding.
+        override fun onServiceDisconnected(name: ComponentName) = onGatewayCallback {
             binder = null
             started = false
         }
 
-        override fun onBindingDied(name: ComponentName) = synchronized(lock) { resetBindingLocked() }
-        override fun onNullBinding(name: ComponentName) = synchronized(lock) { resetBindingLocked() }
+        override fun onBindingDied(name: ComponentName) = onGatewayCallback { resetBindingLocked() }
+        override fun onNullBinding(name: ComponentName) = onGatewayCallback { resetBindingLocked() }
     }
 
-    private inline fun transactLocked(code: Int, write: (Parcel) -> Unit): Int {
+    private inline fun transactLocked(code: Int, returnsValue: Boolean = true, write: (Parcel) -> Unit): Int {
         val target = binder ?: return -1
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         return try {
             data.writeInterfaceToken(SOMEIP_TOKEN)
             write(data)
-            target.transact(code, data, reply, 0)
+            check(target.transact(code, data, reply, 0)) { "Unsupported transaction $code" }
             reply.readException()
-            reply.readInt()
+            if (returnsValue) reply.readInt() else 0
         } catch (error: Throwable) {
             Log.w(TAG, "SOME/IP transaction $code failed", error)
             -1
@@ -208,11 +235,14 @@ internal object BydHudBridge {
             it.writeInt(payload.size)
             it.writeByteArray(payload)
         }
-        if (result < 0) {
-            Log.w(TAG, "HUD send result=$result")
+        if (lastSendResult != result) {
+            Log.i(TAG, "HUD fireEvent result=$result bytes=${payload.size}")
+            lastSendResult = result
+        }
+        if (result != 0) {
             if (binder?.isBinderAlive != true) resetBindingLocked()
         }
-        return result >= 0
+        return BydHudProtocol.eventAccepted(result)
     }
 
     private fun resetBindingLocked() {
