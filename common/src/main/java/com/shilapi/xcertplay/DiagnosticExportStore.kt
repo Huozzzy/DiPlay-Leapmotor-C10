@@ -1,12 +1,16 @@
 package com.shilapi.xcertplay
 
+import android.Manifest
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
 import java.io.File
@@ -14,19 +18,39 @@ import java.io.IOException
 
 /** Saves an app-owned report without depending on an OEM's document-picker activity. */
 internal object DiagnosticExportStore {
+    private const val TAG = "DiagnosticExport"
+
     data class SavedReport(
         val uri: Uri,
         val savedInApp: Boolean = false,
         val savedPath: String? = null,
     )
 
-    /** Android 9 and OEMs without working Downloads storage can still export privately. */
+    /**
+     * Saves to the visible Downloads/DiPlay folder whenever the head unit allows it, so the
+     * report can be reached from a file manager or USB. Order:
+     *  1. Android 10+: MediaStore Downloads (no permission needed).
+     *  2. Direct file in public Downloads/DiPlay: Android 11+ allows it without permission;
+     *     Android 9/10 need WRITE_EXTERNAL_STORAGE (Android 10 also needs legacy storage).
+     *     Some DiLink builds lack a working MediaStore Downloads provider, so this also
+     *     covers Android 10+ when step 1 fails.
+     *  3. App-specific external storage (Android/data/<package>, hidden on many head units).
+     *  4. Internal app storage, shared through the report viewer.
+     */
     fun saveWithoutPicker(context: Context, fileName: String, report: String): SavedReport {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 return SavedReport(saveToDownloads(context.contentResolver, fileName, report))
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 // Preserve the report even when the OEM's public storage provider is absent.
+                Log.w(TAG, "MediaStore Downloads unavailable; trying the public folder directly", error)
+            }
+        }
+        if (canWritePublicDownloads(context)) {
+            try {
+                return saveToPublicDownloads(context, fileName, report)
+            } catch (error: Exception) {
+                Log.w(TAG, "Public Downloads folder unavailable; saving in app storage", error)
             }
         }
         try {
@@ -59,6 +83,39 @@ internal object DiagnosticExportStore {
             directory.listFiles()?.filter { it != file && it.isFile }
                 ?.sortedByDescending { it.lastModified() }?.drop(7)?.forEach { it.delete() }
             return SavedReport(uri, savedInApp = savedInApp, savedPath = if (savedInApp) null else file.absolutePath)
+        } catch (error: Exception) {
+            file.delete()
+            throw error
+        }
+    }
+
+    /** Android 11+ lets any app create files in Downloads; older versions need the permission. */
+    fun canWritePublicDownloads(context: Context, sdkInt: Int = Build.VERSION.SDK_INT): Boolean =
+        sdkInt >= Build.VERSION_CODES.R ||
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+
+    /** True when asking for storage access lets the report reach the visible Downloads folder. */
+    fun needsStoragePermission(context: Context, sdkInt: Int = Build.VERSION.SDK_INT): Boolean =
+        sdkInt < Build.VERSION_CODES.R && !canWritePublicDownloads(context, sdkInt)
+
+    @Suppress("DEPRECATION")
+    fun publicDownloadsDirectory(): File =
+        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DiPlay")
+
+    private fun saveToPublicDownloads(context: Context, fileName: String, report: String): SavedReport {
+        val directory = publicDownloadsDirectory()
+        if (!directory.isDirectory && !directory.mkdirs()) throw IOException("Downloads/DiPlay is unavailable")
+        val base = fileName.removeSuffix(".txt")
+        var file = File(directory, fileName)
+        var copy = 1
+        while (file.exists()) file = File(directory, "$base-${copy++}.txt")
+        try {
+            file.writeText(report, Charsets.UTF_8)
+            if (file.length() == 0L && report.isNotEmpty()) throw IOException("Downloads/DiPlay did not keep the report")
+            // The user's Downloads folder is never pruned: only DiPlay's private copies are.
+            MediaScannerConnection.scanFile(context.applicationContext, arrayOf(file.absolutePath), arrayOf("text/plain"), null)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.diagnostic-reports", file)
+            return SavedReport(uri, savedPath = file.absolutePath)
         } catch (error: Exception) {
             file.delete()
             throw error
