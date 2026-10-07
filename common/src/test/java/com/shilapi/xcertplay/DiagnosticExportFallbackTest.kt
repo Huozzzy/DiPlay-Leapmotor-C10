@@ -77,7 +77,6 @@ class DiagnosticExportFallbackTest {
         assertEquals(file.absolutePath, saved.savedPath)
         assertFalse(saved.savedInApp)
         assertEquals("report", read(saved.uri))
-        assertNull(reports.listFiles())
     }
 
     @Test fun repeatedPublicExportsNeverOverwriteAnEarlierReport() {

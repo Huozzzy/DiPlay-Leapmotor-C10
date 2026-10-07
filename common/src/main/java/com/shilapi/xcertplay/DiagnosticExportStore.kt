@@ -112,14 +112,31 @@ internal object DiagnosticExportStore {
         try {
             file.writeText(report, Charsets.UTF_8)
             if (file.length() == 0L && report.isNotEmpty()) throw IOException("Downloads/DiPlay did not keep the report")
-            // The user's Downloads folder is never pruned: only DiPlay's private copies are.
-            MediaScannerConnection.scanFile(context.applicationContext, arrayOf(file.absolutePath), arrayOf("text/plain"), null)
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.diagnostic-reports", file)
-            return SavedReport(uri, savedPath = file.absolutePath)
         } catch (error: Exception) {
             file.delete()
             throw error
         }
+        // The report is saved; nothing below may undo that. The user's Downloads folder is never pruned.
+        runCatching {
+            MediaScannerConnection.scanFile(context.applicationContext, arrayOf(file.absolutePath), arrayOf("text/plain"), null)
+        }
+        val uri = try {
+            FileProvider.getUriForFile(context, "${context.packageName}.diagnostic-reports", file)
+        } catch (error: IllegalArgumentException) {
+            // Some storage layouts resolve Downloads outside the provider's external root.
+            // Share a private copy instead; the visible file in Downloads/DiPlay stays.
+            Log.w(TAG, "Downloads/DiPlay is not shareable through the provider; sharing a private copy", error)
+            privateShareCopy(context, fileName, report)
+        }
+        return SavedReport(uri, savedPath = file.absolutePath)
+    }
+
+    private fun privateShareCopy(context: Context, fileName: String, report: String): Uri {
+        val external = runCatching { context.getExternalFilesDir(null) }.getOrNull()
+        if (external != null) {
+            runCatching { return saveInDirectory(context, File(external, "diagnostic-reports"), fileName, report).uri }
+        }
+        return saveInDirectory(context, File(context.filesDir, "diagnostic-reports"), fileName, report, savedInApp = true).uri
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
