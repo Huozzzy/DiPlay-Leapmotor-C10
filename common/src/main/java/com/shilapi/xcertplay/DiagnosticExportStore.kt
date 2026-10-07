@@ -102,7 +102,7 @@ internal object DiagnosticExportStore {
     fun publicDownloadsDirectory(): File =
         File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DiPlay")
 
-    private fun saveToPublicDownloads(context: Context, fileName: String, report: String): SavedReport {
+    internal fun saveToPublicDownloads(context: Context, fileName: String, report: String): SavedReport {
         val directory = publicDownloadsDirectory()
         if (!directory.isDirectory && !directory.mkdirs()) throw IOException("Downloads/DiPlay is unavailable")
         val base = fileName.removeSuffix(".txt")

@@ -63,6 +63,12 @@ class DiagnosticExportFallbackTest {
         assertEquals("report", read(saved.uri))
     }
 
+    @Test fun publicDownloadsWriteSucceedsDirectly() {
+        val saved = DiagnosticExportStore.saveToPublicDownloads(context, "DiPlay-direct.txt", "report")
+        assertEquals("report", File(publicReports, "DiPlay-direct.txt").readText())
+        assertEquals("report", read(saved.uri))
+    }
+
     @Test fun androidNineWithStorageAccessSavesToTheVisibleDownloadsFolder() {
         shadowOf(context).grantPermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         val saved = DiagnosticExportStore.saveWithoutPicker(context, "DiPlay-test.txt", "report")
