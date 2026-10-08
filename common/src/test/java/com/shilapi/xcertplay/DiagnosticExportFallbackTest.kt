@@ -88,8 +88,7 @@ class DiagnosticExportFallbackTest {
         assertEquals("second", read(second.uri))
     }
 
-    @Test @Config(sdk = [29]) fun missingMediaStoreDownloadsUsesThePublicFolderWhenAllowed() {
-        shadowOf(context).grantPermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    @Test @Config(sdk = [30]) fun missingMediaStoreDownloadsUsesThePublicFolderWithoutPermission() {
         val provider = MissingDownloadsProvider()
         provider.attachInfo(context, ProviderInfo().apply { authority = "media" })
         ShadowContentResolver.registerProviderInternal("media", provider)
@@ -99,9 +98,9 @@ class DiagnosticExportFallbackTest {
         assertEquals("report", read(saved.uri))
     }
 
-    @Test fun storageAccessIsOnlyRequestedBeforeAndroidEleven() {
+    @Test fun storageAccessIsOnlyRequestedOnAndroidNine() {
         assertTrue(DiagnosticExportStore.needsStoragePermission(context, sdkInt = 28))
-        assertTrue(DiagnosticExportStore.needsStoragePermission(context, sdkInt = 29))
+        assertFalse(DiagnosticExportStore.needsStoragePermission(context, sdkInt = 29))
         assertFalse(DiagnosticExportStore.needsStoragePermission(context, sdkInt = 30))
         shadowOf(context).grantPermissions(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         assertFalse(DiagnosticExportStore.needsStoragePermission(context, sdkInt = 28))

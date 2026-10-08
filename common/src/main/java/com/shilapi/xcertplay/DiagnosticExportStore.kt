@@ -31,9 +31,8 @@ internal object DiagnosticExportStore {
      * report can be reached from a file manager or USB. Order:
      *  1. Android 10+: MediaStore Downloads (no permission needed).
      *  2. Direct file in public Downloads/DiPlay: Android 11+ allows it without permission;
-     *     Android 9/10 need WRITE_EXTERNAL_STORAGE (Android 10 also needs legacy storage).
-     *     Some DiLink builds lack a working MediaStore Downloads provider, so this also
-     *     covers Android 10+ when step 1 fails.
+     *     Android 9 needs WRITE_EXTERNAL_STORAGE. Some DiLink builds lack a working
+     *     MediaStore Downloads provider, so this also covers Android 11+ when step 1 fails.
      *  3. App-specific external storage (Android/data/<package>, hidden on many head units).
      *  4. Internal app storage, shared through the report viewer.
      */
@@ -94,9 +93,12 @@ internal object DiagnosticExportStore {
         sdkInt >= Build.VERSION_CODES.R ||
             context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
 
-    /** True when asking for storage access lets the report reach the visible Downloads folder. */
+    /**
+     * True only on Android 9, the one version where storage access is what puts the report in
+     * the visible Downloads folder. Android 10+ saves there through MediaStore without asking.
+     */
     fun needsStoragePermission(context: Context, sdkInt: Int = Build.VERSION.SDK_INT): Boolean =
-        sdkInt < Build.VERSION_CODES.R && !canWritePublicDownloads(context, sdkInt)
+        sdkInt < Build.VERSION_CODES.Q && !canWritePublicDownloads(context, sdkInt)
 
     @Suppress("DEPRECATION")
     fun publicDownloadsDirectory(): File =

@@ -12,10 +12,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Optional: diagnostic reports in the visible Downloads/DiPlay folder on Android 9/10.
-         Android 11+ needs no permission for this, so it is never requested there. -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"
-        tools:ignore="ScopedStorage" />
+    <!-- Optional: diagnostic reports in the visible Downloads/DiPlay folder on Android 9.
+         Android 10+ needs no permission for this, so it is never requested there. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <!-- Optional: the dashboard map as a card over the home screen. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Optional, owner-enabled Usage Access for the verified DiLink 5.1 cluster profile. -->
@@ -32,8 +31,7 @@
             <data android:mimeType="*/*" />
         </intent>
     </queries>
-    <!-- Android 10 only: lets the Downloads/DiPlay fallback write a plain file. -->
-    <application android:requestLegacyExternalStorage="true">
+    <application>
         <provider
             android:name="com.shilapi.xcertplay.DiagnosticReportProvider"
             android:authorities="${applicationId}.diagnostic-reports"
