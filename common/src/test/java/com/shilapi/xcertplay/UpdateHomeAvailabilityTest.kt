@@ -41,7 +41,7 @@ class UpdateHomeAvailabilityTest {
 
         assertEquals("about", ReflectionHelpers.getField<String>(activity, "page"))
         assertTrue(descendants(activity.window.decorView).filterIsInstance<TextView>().any {
-            it.text == activity.getString(R.string.update_download, release.tagName)
+            it.text == activity.getString(R.string.update_download)
         })
         controller.pause().stop().destroy()
     }
