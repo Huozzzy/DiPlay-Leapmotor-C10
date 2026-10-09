@@ -2242,7 +2242,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun downloadUpdate() {
-        val release = updateRelease ?: return
+        if (updateRelease == null) return
+        lateinit var release: UpdateRelease
         updateStage = UpdateStage.DOWNLOADING
         updateSavedPath = null
         updateProgress = null
@@ -2253,6 +2254,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             // Each attempt owns its files, including across activity recreation.
             val directory = File(cacheDir, "update/${java.util.UUID.randomUUID()}")
             val outcome = runCatching {
+                // The cached release can be a day old. Download the newest one.
+                release = latestRelease() ?: throw IOException(getString(R.string.update_up_to_date))
                 val checksumsFile = File(directory, UpdateCatalog.CHECKSUMS_FILE)
                 UpdateClient.download(release.checksumsUrl, checksumsFile) { _, _ -> }
                 val apkFile = File(directory, release.apkName)
@@ -2280,6 +2283,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
                 outcome.fold(
                     { file ->
+                        updateRelease = release
                         updateFile = file
                         updateSavedPath = savedPath
                         updateStage = UpdateStage.READY
