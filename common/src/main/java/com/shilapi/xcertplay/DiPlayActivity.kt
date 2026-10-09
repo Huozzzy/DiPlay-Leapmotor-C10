@@ -1724,6 +1724,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         // Opt-in controls that can cost sound or video on some head units.
         filteredSection(content, SettingsSection.ADVANCED_MEDIA,
             getString(R.string.settings_advanced_media), R.drawable.ic_dp_advanced) { card ->
+            if (Build.VERSION.SDK_INT == 32) {
+                toggle(card, getString(R.string.settings_hide_byd_call_popup),
+                    getString(R.string.settings_hide_byd_call_popup_description),
+                    AirPlayPersistence.loadHideBydCallPopup(this)) {
+                    AirPlayPersistence.saveHideBydCallPopup(this, it)
+                }
+            }
             toggle(card, getString(R.string.efficient_video), getString(R.string.use_hevc_leave_off_for_the_widest_head_unit_compatibility), AirPlayPersistence.loadHevcEnabled(this)) { AirPlayPersistence.saveHevcEnabled(this, it); markReconnectNeeded() }
             toggle(card, getString(R.string.smooth_video), getString(R.string.smooth_video_description),
                 AirPlayPersistence.loadSmoothVideo(this)) {
