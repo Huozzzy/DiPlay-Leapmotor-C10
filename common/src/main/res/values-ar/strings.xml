@@ -668,7 +668,7 @@
     <string name="update_verifying">جارٍ التحقق…</string>
     <string name="update_install">تثبيت %1$s</string>
     <string name="update_failed">فشل التحديث</string>
-    <string name="update_available_home">يتوفر التحديث %1$s</string>
+    <string name="update_available_home">يتوفر تحديث</string>
     <string name="update_saved_to">تم الحفظ في %1$s</string>
     <string name="settings_background_update_checks">التحقق من التحديثات في الخلفية</string>
     <string name="settings_background_update_checks_description">مرة كل يوم، يتحقق DiPlay من GitHub عن إصدار جديد ويعرضه في الشاشة الرئيسية. لا يتم التنزيل أبدًا دون نقرتك.</string>

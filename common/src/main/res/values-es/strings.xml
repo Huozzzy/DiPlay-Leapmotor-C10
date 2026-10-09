@@ -668,7 +668,7 @@
     <string name="update_verifying">Verificando…</string>
     <string name="update_install">Instalar %1$s</string>
     <string name="update_failed">Error de actualización</string>
-    <string name="update_available_home">Actualización %1$s disponible</string>
+    <string name="update_available_home">Actualización disponible</string>
     <string name="update_saved_to">Guardado en %1$s</string>
     <string name="settings_background_update_checks">Buscar actualizaciones en segundo plano</string>
     <string name="settings_background_update_checks_description">Una vez al día, DiPlay busca una versión nueva en GitHub y la muestra en la pantalla de inicio. Nunca descarga sin que lo toques.</string>

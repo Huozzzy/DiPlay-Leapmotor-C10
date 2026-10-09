@@ -30,7 +30,7 @@ class UpdateHomeAvailabilityTest {
         UpdateAvailability.save(application, release)
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java).setup()
         val activity = controller.get()
-        val text = activity.getString(R.string.update_available_home, release.tagName)
+        val text = activity.getString(R.string.update_available_home)
         val update = descendants(activity.window.decorView).filterIsInstance<TextView>()
             .single { it.text == text }
 
@@ -53,7 +53,7 @@ class UpdateHomeAvailabilityTest {
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java).setup()
         val activity = controller.get()
         val update = descendants(activity.window.decorView).filterIsInstance<TextView>().single {
-            it.text == activity.getString(R.string.update_available_home, release.tagName)
+            it.text == activity.getString(R.string.update_available_home)
         }
 
         assertTrue(update.minHeight >= (48 * activity.resources.displayMetrics.density).toInt())

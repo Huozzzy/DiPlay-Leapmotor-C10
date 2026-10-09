@@ -872,7 +872,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         else right.addView(space(12))
         right.addView(label(getString(R.string.home_public_preview, version()), 12, MUTED).apply { letterSpacing = .08f })
         availableUpdate?.let { release ->
-            val message = getString(R.string.update_available_home, release.tagName)
+            val message = getString(R.string.update_available_home)
             val tint = { alpha: Int -> (WARNING and 0x00FFFFFF) or (alpha shl 24) }
             val chip = GradientDrawable().apply {
                 setColor(tint(0x26))

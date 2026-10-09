@@ -668,7 +668,7 @@
     <string name="update_verifying">Проверка…</string>
     <string name="update_install">Установить %1$s</string>
     <string name="update_failed">Не удалось обновить</string>
-    <string name="update_available_home">Доступно обновление %1$s</string>
+    <string name="update_available_home">Доступно обновление</string>
     <string name="update_saved_to">Сохранено в %1$s</string>
     <string name="settings_background_update_checks">Проверять обновления в фоне</string>
     <string name="settings_background_update_checks_description">Раз в сутки DiPlay проверяет GitHub на новую версию и показывает её на главном экране. Загрузка начинается только после вашего нажатия.</string>
