@@ -21,7 +21,7 @@ Connect the iPhone to a USB **data** port with a data-capable cable and choose *
 
 ## Settings
 
-The first-launch DiLink setup guide can be skipped or reopened from Settings. **About** offers a manual check for official GitHub updates; Android handles APK installation. **App appearance** selects Light, Dark or Auto for DiPlay itself, separately from CarPlay day/night mode.
+The first-launch DiLink setup guide can be skipped or reopened from Settings. DiPlay checks for official GitHub updates once a day and shows **Update available** on Home; **About** downloads it on your tap and can turn the background check off. Android handles APK installation. **App appearance** selects Light, Dark or Auto for DiPlay itself, separately from CarPlay day/night mode.
 
 Swipe down with the configured finger count in CarPlay to open the quick menu, or return to the home screen. Choose two, three or four fingers, or **Off**, under **Settings → Vehicle → CarPlay controls** or in the quick menu; three remains the default. The quick menu asks before Back or the full-settings link discards changes you have not applied. Icon/text size, resolution and frame rate use **Apply and reconnect** during an active session. A selection alone does not apply; Cancel preserves the old setting. When disconnected, **Save** applies to the next connection. Follow each setting's description: some apply live, while others show **Reconnect now** and take effect at the next connection.
 
