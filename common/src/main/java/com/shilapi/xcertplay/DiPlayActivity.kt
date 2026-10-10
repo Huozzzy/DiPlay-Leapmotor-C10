@@ -3234,8 +3234,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (!NavigationWheelSettings.enabled(this) || WheelKeyService.connected()) return
         card.addView(label(getString(R.string.settings_navigation_wheel_service_required), 14, WARNING))
         card.addView(button(getString(R.string.wheel_keys_open_settings), false) {
-            runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-                .onFailure { toast(getString(R.string.wheel_keys_no_settings)) }
+            if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
         }, matchButton(10, 56))
         card.addView(button(getString(R.string.wheel_keys_enable_adb), false) {
             Thread({
@@ -3354,8 +3353,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }, "diplay-wheel-keys-enable").start()
             }, matchButton(10, 56))
             card.addView(button(getString(R.string.wheel_keys_open_settings), false) {
-                runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-                    .onFailure { toast(getString(R.string.wheel_keys_no_settings)) }
+                if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
             }, matchButton(10, 56))
         }
     }
