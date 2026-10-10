@@ -36,7 +36,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
-import androidx.core.content.edit
 import androidx.core.widget.doAfterTextChanged
 import androidx.core.view.doOnLayout
 import androidx.core.view.WindowCompat
@@ -1145,19 +1144,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         toggle(this, getString(R.string.report_location_to_iphone),
             "${getString(R.string.location_reporting_reconnects)} ${getString(R.string.sends_precise_android_location_as_carplay_gps_data_when_th)}",
             AirPlayPersistence.loadLocationReportingEnabled(this@DiPlayActivity), save = ::onLocationReportingChanged)
-        // External HID / Rotary Control
-        toggle(
-            this,
-            "External HID / Rotary Control",
-            "Enable Bluetooth keyboard and rotary controller input alongside touchscreen control.",
-            getSharedPreferences("external_hid_settings", android.content.Context.MODE_PRIVATE)
-                .getBoolean("enabled", false)
-        ) { enabled ->
-            getSharedPreferences("external_hid_settings", android.content.Context.MODE_PRIVATE)
-                .edit {
-                    putBoolean("enabled", enabled)
-                }
-        }
         Unit
     }
 
@@ -3274,6 +3260,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             (zoomAvailable && WheelZoomSettings.enabled(this))
         if (WheelZoomSettings.siriKey(this) || vehicleKeysOn) wheelKeyServiceControls(card)
         siriKeyControls(card)
+        // Any head unit: a paired keyboard, remote or rotary controller works alongside touch.
+        toggle(card, getString(R.string.settings_external_controller), getString(R.string.settings_external_controller_description),
+            AirPlayPersistence.loadExternalController(this)) { AirPlayPersistence.saveExternalController(this, it) }
         // Keep previously configured controls reachable even if package detection misses the car.
         if (byd || zoomAvailable || WheelZoomSettings.joystick(this)) wheelKeyControls(card)
     }

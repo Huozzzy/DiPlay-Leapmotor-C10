@@ -378,16 +378,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private var advancedAudioChannelMapping = false
     private var navigationStreamType = 14
     private var debugLogsEnabled = false
-
-    private val externalHidPrefs by lazy {
-        getSharedPreferences("external_hid_settings", Context.MODE_PRIVATE)
-    }
-
-    private var externalHidEnabled: Boolean
-        get() = externalHidPrefs.getBoolean("enabled", false)
-        set(value) {
-            externalHidPrefs.edit().putBoolean("enabled", value).apply()
-        }
     private var autoStartOnBoot = false
     private var manufacturer = AirPlayPersistence.DEFAULT_MANUFACTURER
     private var model = AirPlayPersistence.DEFAULT_MODEL
@@ -1330,9 +1320,9 @@ class CarPlayHostActivity : ComponentActivity() {
             return true
         }
         if (!menuOpen &&
-            (AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this) || externalHidEnabled) &&
+            (AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this) ||
+                CarPlayRemoteKeys.fromExternalController(event, AirPlayPersistence.loadExternalController(this))) &&
             CarPlayRemoteKeys.dispatch(event, controller)) {
-
             if (event.repeatCount == 0) {
                 Log.d(
                     TAG,
