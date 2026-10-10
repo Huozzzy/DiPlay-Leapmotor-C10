@@ -11,3 +11,21 @@ Changes through DiPlay 0.2.16 are documented in [0.2.16 release notes](RELEASE-N
 - The USB auto-confirm accessibility service now recognizes the Android 10+ permission dialog, which reads "Allow DiPlay to access iPhone?" without the word USB, and the Chinese wording "要允许DiPlay访问iPhone吗？". **Open accessibility settings** falls back to BYD's own accessibility screen when the standard Android screen is missing ([#409](https://github.com/shihabal3amri/DiPlay/issues/409), [#521](https://github.com/shihabal3amri/DiPlay/issues/521)).
 - When an iPhone refuses to switch into wired CarPlay mode, DiPlay now asks to unlock it and reconnect the cable, and says that iOS 15 or earlier may need an iOS update or wireless CarPlay, instead of "Connection interrupted". iOS 12 and 15 refused the switch while unlocked, and iOS 17 and later accept it ([#509](https://github.com/shihabal3amri/DiPlay/issues/509), [#455](https://github.com/shihabal3amri/DiPlay/issues/455)). The diagnostic report now records the iPhone's current USB mode and configurations when it refuses.
 - Retry claiming and selecting the NCM interfaces up to five times, 100 ms apart, when the head unit's own USB network driver briefly holds them ([#518](https://github.com/shihabal3amri/DiPlay/issues/518), [#557](https://github.com/shihabal3amri/DiPlay/issues/557)). When the wired or wireless network setup fails, the report now names the exception chain and where it was thrown; Android 7.1 had logged only "Invalid argument" ([#557](https://github.com/shihabal3amri/DiPlay/issues/557)).
+
+## Audio, calls and Siri
+
+- App voice notes, for example in WhatsApp, now record the head unit's microphone when the iPhone asks for input on app audio. Calls and Siri are unchanged, and guidance prompts stay without the microphone. The report logs each app-audio setup and whether the microphone opened ([#548](https://github.com/shihabal3amri/DiPlay/pull/548)).
+- Opus 16 kHz microphone packets, used for voice notes, now advance the RTP clock at 16 kHz instead of 48 kHz, which made voice notes sound slurred. The report measures the iPhone's own clock for each audio stream ([#547](https://github.com/shihabal3amri/DiPlay/pull/547)). Pending in-car acceptance.
+
+## Vehicle
+
+- Experimental and off by default: hide BYD's own call popup while connected CarPlay is in the foreground, on BYD Android 12L with approved network ADB. The original popup setting is restored when CarPlay leaves the foreground, disconnects or stops ([#539](https://github.com/shihabal3amri/DiPlay/pull/539)). Not yet run in a car through DiPlay.
+- Ambient lighting can follow the album cover: usable artwork sets a base color and the music moves within nearby supported colors. Gray, dark or missing covers keep the selected colors ([#537](https://github.com/shihabal3amri/DiPlay/pull/537)).
+- Ambient lighting settings can be saved on firmware whose hotfix framework prints a line before the lamp worker's reply, seen on a 2024 Tang ([#550](https://github.com/shihabal3amri/DiPlay/pull/550)).
+- Experimental: **Vehicle → Wheel keys → External controller** lets a paired Bluetooth keyboard, remote or rotary controller move and select in CarPlay alongside touch. Only keys from a real input device are used ([#549](https://github.com/shihabal3amri/DiPlay/pull/549)).
+
+## Setup, updates and diagnostics
+
+- The setup guide recognizes the DiLink generation from BYD's controller version, for example 21 for DiLink 4 and 23 for DiLink 5 ([#531](https://github.com/shihabal3amri/DiPlay/pull/531)).
+- DiPlay checks GitHub for a new release once a day and shortly after it opens, and shows "Update available" on Home. Nothing downloads without a tap, and **About** turns the check off. On Android 10 and later, a verified update is also copied to `Download/DiPlay` for head units whose installer cannot open it ([#488](https://github.com/shihabal3amri/DiPlay/pull/488)).
+- On Android 9 and earlier, **Save diagnostic report** asks for storage access and saves to `Download/DiPlay`; without it, the report is saved in app storage as before. Android 11 and later also save there when the system Downloads provider fails ([#541](https://github.com/shihabal3amri/DiPlay/pull/541)).
