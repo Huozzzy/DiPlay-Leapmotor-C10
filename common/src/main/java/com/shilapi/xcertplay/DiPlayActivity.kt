@@ -18,6 +18,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.net.Uri
@@ -71,11 +72,14 @@ import com.shilapi.xcertplay.settings.SettingsWidgets
 import com.shilapi.xcertplay.setup.DiLinkGeneration
 import com.shilapi.xcertplay.setup.SetupGuide
 import com.shilapi.xcertplay.transport.EvChargingConnectors
+import com.shilapi.xcertplay.update.BackgroundUpdateScheduler
+import com.shilapi.xcertplay.update.UpdateApkExport
+import com.shilapi.xcertplay.update.UpdateAvailability
 import com.shilapi.xcertplay.update.UpdateCatalog
-import com.shilapi.xcertplay.update.UpdateClient
 import com.shilapi.xcertplay.update.UpdateChecksums
+import com.shilapi.xcertplay.update.UpdateClient
 import com.shilapi.xcertplay.update.UpdateRelease
-import com.shilapi.xcertplay.update.UpdateVersion
+import com.shilapi.xcertplay.update.UpdateReleaseLookup
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -208,6 +212,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var vehicleProbeOutcome: BydVehicleProbeOutcome? = null
     private var adbCheckGeneration = 0
     private var adbStatus: TextView? = null
+    private var availableUpdate: UpdateRelease? = null
+    private var updateSavedPath: String? = null
     @Volatile private var updateStage = UpdateStage.IDLE
     @Volatile private var updateGeneration = 0
     @Volatile private var updateProgress: Int? = null
@@ -334,6 +340,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (savedInstanceState == null && isLauncherIntent(intent) && CarPlayBackgroundSession.hasSession()) {
             openProjection(); finish(); return
         }
+        scheduleBackgroundUpdateChecks()
+        availableUpdate = UpdateAvailability.available(this, version())
         enforceInterfaceSize()
         refreshAppearance()
         rememberLaunchAppearance()
@@ -869,6 +877,30 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (!compact) right.addView(label(getString(R.string.make_diplay_feel_right_for_your_car), 14, MUTED).apply { gravity = Gravity.CENTER; setPadding(0, dp(10), 0, dp(24)) })
         else right.addView(space(12))
         right.addView(label(getString(R.string.home_public_preview, version()), 12, MUTED).apply { letterSpacing = .08f })
+        availableUpdate?.let { release ->
+            val message = getString(R.string.update_available_home)
+            val tint = { alpha: Int -> (WARNING and 0x00FFFFFF) or (alpha shl 24) }
+            val chip = GradientDrawable().apply {
+                setColor(tint(0x26))
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), tint(0x80))
+            }
+            right.addView(label(message, 14, WARNING, true).apply {
+                gravity = Gravity.CENTER
+                minHeight = dp(60)
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                isClickable = true
+                isFocusable = true
+                contentDescription = message
+                background = RippleDrawable(
+                    ColorStateList.valueOf(RIPPLE),
+                    chip,
+                    GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(16).toFloat() },
+                )
+                foreground = focusRing(radiusDp = 16)
+                setOnClickListener { openAvailableUpdate(release) }
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        }
         if (compact && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             val compactRight = column().apply {
                 addView(space(8))
@@ -2135,6 +2167,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         section(content, getString(R.string.about_public_preview_prefix, version())) { card ->
             card.addView(label(getString(R.string.an_independent_carplay_receiver_for_android_head_units_wir), 17, TEXT))
             card.addView(updateRow())
+            toggle(card, getString(R.string.settings_background_update_checks),
+                getString(R.string.settings_background_update_checks_description),
+                UpdateAvailability.backgroundChecksEnabled(this)) { UpdateAvailability.saveBackgroundChecksEnabled(this, it) }
         }
         section(content, getString(R.string.made_possible_by_open_source)) { card ->
             card.addView(label(getString(R.string.receiver_based_on_xcertplay_licensed_under_gpl_3_0_diplay), 16, MUTED))
@@ -2152,13 +2187,16 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     matchButton(if (updateMessage == null) 0 else 10, 60))
             UpdateStage.CHECKING -> container.addView(label(getString(R.string.update_checking), 14, MUTED))
             UpdateStage.AVAILABLE -> container.addView(
-                button(getString(R.string.update_download, updateRelease?.tagName.orEmpty()), true) { downloadUpdate() },
+                button(getString(R.string.update_download), true) { downloadUpdate() },
                 matchButton(10, 60))
             UpdateStage.DOWNLOADING -> container.addView(label(getString(R.string.update_downloading, updateProgress ?: 0), 14, MUTED))
             UpdateStage.VERIFYING -> container.addView(label(getString(R.string.update_verifying), 14, MUTED))
-            UpdateStage.READY -> container.addView(
-                button(getString(R.string.update_install, updateRelease?.tagName.orEmpty()), true) { installUpdate() },
-                matchButton(10, 60))
+            UpdateStage.READY -> {
+                container.addView(
+                    button(getString(R.string.update_install, updateRelease?.tagName.orEmpty()), true) { installUpdate() },
+                    matchButton(10, 60))
+                updateSavedPath?.let { container.addView(label(getString(R.string.update_saved_to, it), 13, MUTED).apply { setPadding(0, dp(10), 0, 0) }) }
+            }
         }
         return container
     }
@@ -2174,10 +2212,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 if (generation != updateGeneration || isFinishing || isDestroyed) return@runOnUiThread
                 outcome.fold(
                     { release ->
+                        UpdateAvailability.recordAttempt(this, System.currentTimeMillis())
+                        availableUpdate = release
                         if (release == null) {
+                            UpdateAvailability.clear(this)
                             updateMessage = getString(R.string.update_up_to_date)
                             updateStage = UpdateStage.IDLE
                         } else {
+                            UpdateAvailability.save(this, release)
                             updateRelease = release
                             updateStage = UpdateStage.AVAILABLE
                         }
@@ -2195,18 +2237,27 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun latestRelease(): UpdateRelease? {
-        val json = UpdateClient.fetchText(
-            UpdateClient.RELEASES_URL,
-            "application/vnd.github+json",
-            userAgent(),
-        )
-        val release = UpdateCatalog.parse(json) ?: return null
-        return release.takeIf { UpdateVersion.isNewer(it.tagName, version()) }
+        return UpdateReleaseLookup.latest(version(), userAgent())
+    }
+
+    private fun openAvailableUpdate(release: UpdateRelease) {
+        updateRelease = release
+        updateMessage = null
+        updateStage = UpdateStage.AVAILABLE
+        page = "about"
+        render()
+    }
+
+    private fun scheduleBackgroundUpdateChecks() {
+        runCatching { BackgroundUpdateScheduler.schedule(applicationContext) }
+            .onFailure { Log.i("DiPlay-Update", "background update scheduling unavailable", it) }
     }
 
     private fun downloadUpdate() {
-        val release = updateRelease ?: return
+        if (updateRelease == null) return
+        lateinit var release: UpdateRelease
         updateStage = UpdateStage.DOWNLOADING
+        updateSavedPath = null
         updateProgress = null
         updateMessage = null
         val generation = ++updateGeneration
@@ -2215,6 +2266,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             // Each attempt owns its files, including across activity recreation.
             val directory = File(cacheDir, "update/${java.util.UUID.randomUUID()}")
             val outcome = runCatching {
+                // The cached release can be a day old. Download the newest one.
+                release = latestRelease() ?: throw IOException(getString(R.string.update_up_to_date))
                 val checksumsFile = File(directory, UpdateCatalog.CHECKSUMS_FILE)
                 UpdateClient.download(release.checksumsUrl, checksumsFile) { _, _ -> }
                 val apkFile = File(directory, release.apkName)
@@ -2234,6 +2287,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
                 apkFile
             }.onFailure { directory.deleteRecursively() }
+            val savedPath = outcome.getOrNull()?.let { UpdateApkExport.copy(applicationContext, it) }
             runOnUiThread {
                 if (generation != updateGeneration || isFinishing || isDestroyed) {
                     directory.deleteRecursively()
@@ -2241,7 +2295,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
                 outcome.fold(
                     { file ->
+                        updateRelease = release
                         updateFile = file
+                        updateSavedPath = savedPath
                         updateStage = UpdateStage.READY
                         render()
                     },
@@ -4887,6 +4943,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     appendLine(StartupDiagnosticSnapshot.report(appContext))
                     appendLine("Startup settings: openAfterBoot=${AirPlayPersistence.loadAutoStartOnBoot(appContext)} " +
                         "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
+                    appendLine()
+                    appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
                     appendLine()
                     appendLine("--- Recent own-app process exits (Android 11+) ---")
                     appendLine(ProcessExitDiagnostics.report(appContext))
