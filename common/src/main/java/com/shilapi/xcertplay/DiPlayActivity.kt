@@ -3327,6 +3327,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             (zoomAvailable && WheelZoomSettings.enabled(this))
         if (WheelZoomSettings.siriKey(this) || vehicleKeysOn) wheelKeyServiceControls(card)
         siriKeyControls(card)
+        // Any head unit: a paired keyboard, remote or rotary controller works alongside touch.
+        toggle(card, getString(R.string.settings_external_controller), getString(R.string.settings_external_controller_description),
+            AirPlayPersistence.loadExternalController(this)) { AirPlayPersistence.saveExternalController(this, it) }
         // Keep previously configured controls reachable even if package detection misses the car.
         if (byd || zoomAvailable || WheelZoomSettings.joystick(this)) wheelKeyControls(card)
     }

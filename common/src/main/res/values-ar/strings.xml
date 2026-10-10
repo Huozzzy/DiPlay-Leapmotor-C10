@@ -597,6 +597,8 @@
     <string name="wheel_zoom_note_volume">الصوت</string>
     <string name="wheel_joystick">عصا تحكم CarPlay على المقود</string>
     <string name="wheel_joystick_description">يشغّل زر الوسائط في BYD عصا تحكم لشاشة CarPlay الرئيسية ويوقفها، مثل مقبض التحكم الدوّار في السيارة. ما دامت مفعّلة، تحرّك عجلة الصوت أو ⏮ ⏭ التحديد، ويختار ⏯، ويعود الزر المخصّص إلى الخلف؛ ولا تتحكم هذه الأزرار حينها في الموسيقى أو الصوت. أثناء المكالمة تبقى الأزرار للمكالمة. في بعض السيارات يحرّك صوت لوحة التحكم الوسطى التحديد أيضًا.</string>
+    <string name="settings_external_controller">وحدة تحكم خارجية (تجريبي)</string>
+    <string name="settings_external_controller_description">مفاتيح لوحة مفاتيح Bluetooth أو جهاز التحكم عن بُعد أو وحدة التحكم الدوّارة المقترنة تحرّك التحديد في CarPlay وتختار، مثل المقبض الدوّار في السيارة. تبقى الشاشة اللمسية تعمل. يُطبَّق فورًا.</string>
     <string name="wheel_joystick_auto_off">عصا التحكم تتوقف تلقائيًا</string>
     <string name="wheel_joystick_auto_off_description">بعد 15 ثانية دون ضغط، وعند بدء مسار، تعود الأزرار إلى التحكم في الموسيقى والصوت.</string>
     <string name="wheel_joystick_on">عصا التحكم مفعّلة</string>

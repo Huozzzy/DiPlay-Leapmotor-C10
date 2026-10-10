@@ -1323,7 +1323,9 @@ class CarPlayHostActivity : ComponentActivity() {
             }
             return true
         }
-        if (!menuOpen && AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this) &&
+        if (!menuOpen &&
+            (AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this) ||
+                CarPlayRemoteKeys.fromExternalController(event, AirPlayPersistence.loadExternalController(this))) &&
             CarPlayRemoteKeys.dispatch(event, controller)) {
             if (event.repeatCount == 0) {
                 Log.d(
