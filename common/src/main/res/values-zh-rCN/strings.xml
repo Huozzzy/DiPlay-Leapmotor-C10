@@ -849,4 +849,6 @@
     <string name="settings_cluster_speedometer_vertical">速度计垂直位置</string>
     <string name="settings_cluster_speedometer_size">速度计大小</string>
     <string name="settings_cluster_speedometer_opacity">速度计不透明度</string>
+    <string name="settings_harman_fullscreen_experimental">哈曼车机全屏（实验性）</string>
+    <string name="settings_harman_fullscreen_experimental_description">让 CarPlay 占用受支持哈曼车机的原厂侧栏区域。下次打开 CarPlay 窗口时生效；其他固件可能显示异常。</string>
 </resources>

@@ -789,4 +789,6 @@
     <string name="settings_cluster_speedometer_vertical">Положение спидометра по вертикали</string>
     <string name="settings_cluster_speedometer_size">Размер спидометра</string>
     <string name="settings_cluster_speedometer_opacity">Непрозрачность спидометра</string>
+    <string name="settings_harman_fullscreen_experimental">Полный экран Harman (экспериментально)</string>
+    <string name="settings_harman_fullscreen_experimental_description">Позволяет CarPlay занять область штатной боковой панели на совместимых устройствах Harman. Применяется при следующем открытии окна CarPlay; на других прошивках возможны ошибки отображения.</string>
 </resources>

@@ -849,4 +849,6 @@
     <string name="settings_cluster_speedometer_vertical">速度計垂直位置</string>
     <string name="settings_cluster_speedometer_size">速度計大小</string>
     <string name="settings_cluster_speedometer_opacity">速度計不透明度</string>
+    <string name="settings_harman_fullscreen_experimental">Harman 車機全螢幕（實驗性）</string>
+    <string name="settings_harman_fullscreen_experimental_description">讓 CarPlay 佔用受支援 Harman 車機的原廠側欄區域。下次開啟 CarPlay 視窗時生效；其他韌體可能顯示異常。</string>
 </resources>
