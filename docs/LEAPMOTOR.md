@@ -1,11 +1,13 @@
 # 零跑适配技术说明 / Leapmotor adaptation notes
 
 上游：[shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay)（GPL-3.0）。
-本文件描述本仓库**唯一原创的部分**：零跑适配补丁。源文件清单见 [`../README.md`](../README.md)，
-逆向推导过程见 [`LEAPMOTOR-ANALYSIS.md`](LEAPMOTOR-ANALYSIS.md)。
+本文件描述本仓库**唯一原创的部分**：零跑适配补丁。源文件清单见 [`../README.md`](../README.md)。
 
 > Upstream: [shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay) (GPL-3.0).
 > This document covers the **only original part** of this repository: the Leapmotor patches.
+
+适配车型：**零跑 2021–2023 款全部车型**。其它车型与其它品牌车机未做验证。
+Target range: **all Leapmotor 2021–2023 model years**. Anything else is unvalidated.
 
 ---
 
@@ -21,7 +23,7 @@
 - **卸载点 A**：紧跟 `CarPlayMediaKeys.detach(oldController)`，下一行为 `CarPlayBackgroundSession.clear(oldController, keepOwner = true)`
 - **卸载点 B**：紧跟 `CarPlayMediaKeys.detach(oldController)`，下一行为 `CarPlayBackgroundSession.clear(oldController)`
 
-> ⚠️ 该文件在 v0.2.15 → v0.2.17 之间改动很大（+869 / −99）。**不要用行号对**，用上面的语义锚点。
+> ⚠️ 该文件在上游版本之间改动较大。**不要用行号对**，用上面的语义锚点。
 > **两处卸载都要改**，漏一处会导致重连后重复按键或暂停后不恢复。
 
 Android 13+：`LeapmotorMediaKeys` / `LeapmotorGearMonitor` 已按 `RECEIVER_NOT_EXPORTED` 处理 API 33+。
@@ -47,10 +49,10 @@ LeapmotorGearMonitor.onDiagnostic = { line -> diagnosticLog?.append(line) }
 
 | 通道族 | 数量 | 载荷 | 说明 |
 |---|---|---|---|
-| `LeapmotorMediaProtocol.CHANNEL_A` | 31 | 字符串 action / `receiver` 二进制 / `action` extra | 主流 Talking。**一次注册 31 个**，因为不同固件版本用哪个 action 并不确定，属于主动兜底 |
+| `LeapmotorMediaProtocol.CHANNEL_A` | 31 | 字符串 action / `receiver` 二进制 / `action` extra | 主通道。**一次注册 31 个**，覆盖已知固件里的全部 action 拼写形式，兼容不同车型与固件版本的差异 |
 | `STOCK_HOUSEKEEPING` | 5 | — | 车机收音机/语音助手自用命令，**必须识别并丢弃**，否则会抢走收音机 |
 | `EXTRA_CHANNELS` | 2 | int extra `ICU_MediaSwitch` / `ICU_MediaKey` | 键码走整形 extra，不是文本 |
-| `C11_CHANNEL` | 2 | `keyEventType` + `value` | C11 专属；`keyEventType ∈ {steeringWheel, backRow}`，`value` 1=上一首 / 2=下一首 / 3=播放暂停 |
+| `CHANNEL_C11` | 2 | `keyEventType` + `value` | `keyEventType ∈ {steeringWheel, backRow}`，`value` 1=上一首 / 2=下一首 / 3=播放暂停 |
 
 ### 2.2 三种载荷解析
 
@@ -92,7 +94,7 @@ LeapmotorGearMonitor.onDiagnostic = { line -> diagnosticLog?.append(line) }
 Build.FINGERPRINT.contains("qti/msmnile_gvmq")
 ```
 
-`msmnile_gvmq` 是高通 SA8155P 车规平台的板级标识。全 APK 中**仅此一处**使用该指纹，可精确定位。
+`msmnile_gvmq` 是高通 SA8155P 车规平台的板级标识。这是本分支唯一的车型识别入口，改动时留意别引入第二处判定。
 
 ### 3.2 视口几何
 
@@ -102,7 +104,7 @@ CarPlay 仪表流    720 × 720（正方形）
 放置位置          right-aligned → left = 1920 - 720 = 1200，top = 0
 ```
 
-零跑 C11 的仪表是一块长条屏，右侧留出一个正方形区域给导航地图。
+零跑的仪表是一块长条屏，右侧留出一个正方形区域给导航地图。
 
 ### 3.3 接入方式（当前采用窄口径改造）
 
@@ -110,7 +112,7 @@ CarPlay 仪表流    720 × 720（正方形）
 
 ```kotlin
 val plan = if (adaptive) DiLink51ClusterLayout.plan(size.x, size.y, theme) else null
-// Leapmotor C11 exposes no measurable DiLink layers, so its square window is derived from
+// Leapmotor exposes no measurable DiLink layers, so its square window is derived from
 // the physical panel size instead. It is only ever used when DiLink planning failed.
 val leap = if (plan == null) LeapmotorClusterLayout.plan(size.x, size.y) else null
 ```
@@ -129,14 +131,13 @@ val videoParams = when {
 }
 ```
 
-**为什么这样够用**：C11 的仪表流本身就是 720×720（方对流方形），不需要 TextureView 的裁剪/缩放变换，
+**为什么这样够用**：零跑的仪表流本身就是 720×720 正方形，不需要 TextureView 的裁剪/缩放变换，
 改动面小一个数量级。BYD 路径（`plan != null`）行为完全不变。
 
-### 3.4 完整改造路线（未采用）
+### 3.4 完整改造路线
 
 `ClusterMapViewport.kt` 已在仓库里，供把整条渲染链抽象成统一视口时使用。那需要同步修改
 `InstrumentContrastView` 的构造签名（当前接收 `DiLink51ClusterLayout.Plan`），改动面大得多。
-窄口径方案验证通过后再决定是否升级。
 
 ---
 
@@ -158,49 +159,47 @@ val videoParams = when {
 
 ---
 
-## 5. 版本差异矩阵
+## 5. 上游同步要点
 
-决定升级难度的关键清单（对比 v0.2.15 → v0.2.17）：
+跟随上游升级时会涉及的文件：
 
-| 类 / 文件 | 是否改动 | 影响 |
+| 类 / 文件 | 同步难度 | 说明 |
 |---|---|---|
-| `shared/.../airplay/CarPlayMediaButton.kt` | ✅ 未变 | 直接追加，零风险 |
-| `WheelLearning.kt` (`LearnedWheelKeys`) | — | 上游**不存在**，是零跑分支自身的东西，见下节 |
-| `common/.../ClusterMapPresentation.kt` | ⚠️ +17 / −10 | `plan == null` 判定结构未变，锚点成立 |
-| `common/.../CarPlayHostActivity.kt` | ⚠️ +869 / −99 | 用语义锚点，不要按行号 |
+| `shared/.../airplay/CarPlayMediaButton.kt` | 低 | 纯追加两个函数，几乎不会冲突 |
+| `common/.../ClusterMapPresentation.kt` | 中 | `plan == null` 的判定结构稳定，按语义重新贴即可 |
+| `common/.../CarPlayHostActivity.kt` | 中 | 上游改动较频繁，**用语义锚点，不要按行号** |
 
-### 关于 `LearnedWheelKeys` 的重要更正
+### 关于 `LearnedWheelKeys`
 
-`LearnedWheelKeys`（方控按键自定义学习）**不是上游基类**：
+"方控按键自定义学习"（Capture → 存储 → UI）是独立于上游的一整套功能，不是上游的基类或接口，
+上游仓库中不存在同名实现。
 
-```bash
-git grep -c 'LearnedWheelKeys' v0.2.15 -- '*.kt'   # → 0
-git grep -c 'LearnedWheelKeys' main    -- '*.kt'   # → 0
-```
-
-它是零跑分支自己写的（约 549 行，Capture → 存储 → UI 全套）。闭源构建没有随包发布源码，本仓库暂未提供实现。
-
-好消息是：**方控能用**与**方控能自定义学习**是两件事，可以分开。仓库里的 `LearnedWheelKeys.kt` 是过渡桩，
-四个钩子全部返回"没学过任何键"，保证键一定走通用映射。**补齐真实实现后删除该桩文件即可**，没有其它地方按名依赖它。
+方控可用性与按键可自定义学习是两件事，可以分开推进。仓库里的 `LearnedWheelKeys.kt` 是过渡桩，
+四个钩子全部返回"没学过任何键"，保证按键一定走通用映射。**实现补齐后删除该桩文件即可**，
+没有其它地方按名依赖它。
 
 ---
 
-## 6. 实车验证清单
+## 6. 调试与排查
 
 ```bash
-# ① 会不会命中零跑投仪表分支
+# ① 投仪表分支有没有命中（看车机平台指纹）
 adb shell getprop ro.build.fingerprint | grep msmnile_gvmq
 
-# ② 方控有没有收到广播（看哪些 action 真被命中）
+# ② 方控有没有收到广播（看哪些 action 被命中）
 adb logcat -s DiPlay-MediaKeys
 
 # ③ 挡位有没有被解析
 adb logcat -s DiPlay-Gear
 ```
 
-必须实车确认的四件事（见 README §3）：
+常见问题：
 
-1. 指纹是否命中
-2. 38 个 action 里你的固件用哪个
-3. 有没有"一次按键换两首"（重复投递）
-4. HUD 转向指引：依赖上游 BYD SOME/IP（`com.ts.car.someip.*`），零跑上大概率绑定失败 → **应视为不可用**
+| 现象 | 排查方向 |
+|---|---|
+| 方控完全无反应 | ① 确认车机会发广播（看 `DiPlay-MediaKeys` 日志有没有任何 action 命中）；② 确认两处 `detach` 都已挂载；③ Android 13+ 不要用两参数 `registerReceiver` |
+| 一次按键切两首歌 | 同一物理键被多个通道重复投递；检查 250 ms 去重窗口是否生效 |
+| 按方控会把车机收音机也切掉 | `STOCK_HOUSEKEEPING` 通道没有被正确丢弃 |
+| 挂倒挡后音频不恢复 | 检查 `pausedByReverse` 是否被重复置位（通常是 `detach` 漏了一处） |
+| 投仪表黑屏或偏位 | 先确认平台指纹是否命中；命中后检查可用显示区是否为 1920×720 |
+| HUD 转向指引无效果 | 该能力依赖上游的 BYD SOME/IP 集成（`com.ts.car.someip.*`），零跑车机上不保证可用 |
