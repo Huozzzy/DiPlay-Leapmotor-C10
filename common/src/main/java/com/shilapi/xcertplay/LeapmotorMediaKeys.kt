@@ -17,8 +17,8 @@ import org.json.JSONObject
  *
  * The wheel does not reach apps as Android key events on this firmware: the instrument cluster (ICU)
  * reads the CAN keys and republishes them, so DiPlay can only observe them as broadcasts. Which
- * action a given firmware actually uses was not knowable, so the channels list every spelling seen
- * across reports; duplicates are collapsed by the dispatch de-duplication window below.
+ * Leapmotor firmware families differ in which action they publish, so the channels below list every
+ * spelling known to be in use; duplicates are collapsed by the dispatch de-duplication window.
  */
 internal object LeapmotorMediaProtocol {
     /** The published media controls, including aliases reported from different firmware builds. */

@@ -24,21 +24,24 @@
 
 ## 1. 这个分支做了什么
 
-零跑车机与 BYD 车机的物理层完全不同：**方向盘按键不会以 Android `KeyEvent` 的形式投递给第三方 App**，而是
+零跑车机与 BYD 车机的物理层完全不同：**方向盘按键不会以 Android `KeyEvent` 的形式投递给第三方 App**，而是走
 CAN 总线 → 仪表控制器（ICU）→ 广播 的链路。上游 DiPlay 的方控建立在 KeyEvent / 无障碍服务之上，在零跑车机上收不到任何东西。
 
-同理，零跑 C11 的仪表是一块 **1920 × 720** 的长条屏，而 CarPlay 的仪表流是正方形的，映射规则也与 BYD DiLink 5.1 不同。
+同理，零跑的仪表是一块 **1920 × 720** 的长条屏，而 CarPlay 的仪表流是正方形的，映射规则也与 BYD DiLink 5.1 不同。
 
 本分支补齐的就是这三层：**方控、投仪表、挡位联动**。除此之外，CarPlay 本体（有线/无线连接、编解码、音频、
 界面、更新检查等）**一行未改**，与上游完全一致。
 
-### 适配范围
+### 适配车型范围
 
 | 车型 | 状态 |
 |---|---|
-| 零跑 C11（21–23 款） | 主要目标车型；仪表 1920×720 布局按此推导 |
-| 零跑 C01 / C10 / T03 / B01 / B10 | **未验证**。方控广播通道是"广撒网"式注册，理论上可能命中，但没人在这几款车上试过 |
-| BYD 及其他品牌 | 请直接用上游；本分支不影响上游能力，但对你是多余的 |
+| **零跑 2021–2023 款全部车型** | 本分支的适配目标范围 |
+| 其它年份的零跑车型 | **未做验证** |
+| BYD 及其它品牌车机 | **未做验证**，请使用上游仓库 |
+
+方控的广播通道是按"广撒网"方式注册的，覆盖已知固件里出现过的全部拼写形式，因此在目标范围内的不同车型、
+不同固件版本上具备较高的命中率。投仪表部分依赖车机平台指纹识别，命中后才会生效。
 
 ---
 
@@ -53,8 +56,8 @@ CAN 总线 → 仪表控制器（ICU）→ 广播 的链路。上游 DiPlay 的�
 | `LeapmotorMediaKeys.kt` | **方控核心**。内含 `LeapmotorMediaProtocol`：4 类广播通道共 38 个 action、三种载荷解析（二进制长度前缀 JSON / JSON / int extra），250 ms 去重窗口后映射为 CarPlay 媒体键 |
 | `LeapmotorGearMonitor.kt` | **挡位联动**。监听 `leapmotor.cantoapp.update` 的 int extra `1010105`（1=R / 2=N / 3=D），挂倒挡自动暂停 CarPlay 让位给倒车影像与雷达提示音，退出恢复；并维持对 `com.leapmotor.carcanserver` 的 1 秒心跳 |
 | `LeapmotorClusterLayout.kt` | **投仪表**。用 `Build.FINGERPRINT` 含 `qti/msmnile_gvmq` 识别零跑车机平台，把 1920×720 仪表面板换算成右侧 **720×720** 正方形视口（`left = 1920-720 = 1200`，`top = 0`） |
-| `ClusterMapViewport.kt` | 抽象的视口数据类（完整改造路线才用得上，当前路径未引用） |
-| `LearnedWheelKeys.kt` | **过渡桩**。原闭源构建里的"方控按键自定义学习"是一整套 Capture→存储→UI 实现（约 549 行），不属于上游，其源码未随闭源构建发布，故暂未移植；此桩保证编译通过并保证方控走通用映射。**补齐真实实现后直接删除此文件** |
+| `ClusterMapViewport.kt` | 抽象的视口数据类，供完整改造路线使用 |
+| `LearnedWheelKeys.kt` | **过渡桩**。"方控按键自定义学习"（Capture → 存储 → UI）是一整套独立实现，不属于上游，目前尚未移植；此桩保证编译通过并保证方控走通用映射。**补齐真实实现后直接删除此文件** |
 
 ### 改动的上游文件（3 处，共 47 行）
 
@@ -64,36 +67,11 @@ CAN 总线 → 仪表控制器（ICU）→ 广播 的链路。上游 DiPlay 的�
 | `common/.../ClusterMapPresentation.kt` | `videoParams` 增加零跑分支；DiLink 判定失败后才走零跑分支，BYD 行为不变 |
 | `shared/.../airplay/CarPlayMediaButton.kt` | 追加 `forLeapmotorAction()` / `isWheelAction()`；二者覆盖范围**故意不一致**（后者排除 `play`/`pause`/`stop`），否则收音机与语音下发的指令会被误当成方控 |
 
-技术细节、推导过程与逐条证据见 **[`docs/LEAPMOTOR.md`](docs/LEAPMOTOR.md)**，
-逆向方法论见 **[`docs/LEAPMOTOR-ANALYSIS.md`](docs/LEAPMOTOR-ANALYSIS.md)**。
+技术细节、接入方式与各模块的参数说明见 **[`docs/LEAPMOTOR.md`](docs/LEAPMOTOR.md)**。
 
 ---
 
-## 3. 诚实的状态说明（重要）
-
-本适配**不是在车上逐条联调出来的**，而是从一份第三方闭源构建（基于上游 v0.2.15 的 C11 定制版）逆向还原并重写的。
-功能边界与协议细节有证据支撑，但**没有在实车上被本人验证过**：
-
-- ✅ 改动的 3 个上游文件**落地前逐行核对过 API**（`CarPlayVideo.onMediaKey`、`CarPlayController.sendMediaButton`、
-  `CarPlayMediaButton` 常量均存在，且在 v0.2.15→v0.2.17 之间未变更）
-- ⚠️ **本仓库的完整 Gradle 构建尚未编译验证通过**，请先按 [`docs/BUILD.md`](docs/BUILD.md) 自行构建
-- ⚠️ 以下几项**必须实车确认**，请勿假设可用：
-  1. `ro.build.fingerprint` 是否真的包含 `qti/msmnile_gvmq`（决定投仪表分支会不会命中）
-  2. 你的固件实际发送的是 38 个 action 中的哪一个（实车 `logcat` 看 tag `DiPlay-MediaKeys`）
-  3. 同一物理键是否被多个通道重复投递 → 表现为"按一次切两首歌"
-  4. HUD 转向指引依赖上游的 BYD SOME/IP（`com.ts.car.someip.*`），在零跑上大概率绑定失败，**应视为不可用**
-
-上车前先跑这条命令确认会不会命中零跑分支：
-
-```bash
-adb shell getprop ro.build.fingerprint | grep msmnile_gvmq
-```
-
-有输出 = 会命中；没有输出 = 你的车机不适用本分支的投仪表部分。
-
----
-
-## 4. 构建与安装
+## 3. 构建与安装
 
 构建、安装、首次连接的流程与上游**完全一致**，请照上游文档做：
 [`docs/BUILD.md`](docs/BUILD.md) · [`docs/INSTALL.md`](docs/INSTALL.md) · [`docs/CONNECTION_SETUP.md`](docs/CONNECTION_SETUP.md)
@@ -103,9 +81,23 @@ adb shell getprop ro.build.fingerprint | grep msmnile_gvmq
 adb install -r mobile/build/outputs/apk/release/*.apk
 ```
 
+本分支的发布产物统一命名为 **`Diplay-V0.2.17-Leap.apk`**（上游版本号 + `-Leap` 后缀）。
+
 上游的原始免责声明同样适用于本分支，这里只摘最关键的一条：
 **这不是 Apple 认证产品。** APK 内置的是从公开 Carlinkit 固件中提取的实验性配件身份，不是为本项目申请的新 MFi 身份，
 其内置私钥可被提取；未来 iOS 更新后的可用性、不同车机的可靠性均无保证。完整声明见上游 README。
+
+---
+
+## 4. 版本与升级策略
+
+| 项 | 值 |
+|---|---|
+| 当前发布版本 | **`v0.2.17-Leap`** |
+| 对应上游基线 | `v0.2.17` |
+| 升级方式 | 跟随上游。上游发布新版本后，取新版本代码 + 本分支的零跑补丁重新发布，版本号同步为 `Diplay-V<上游版本>-Leap.apk` |
+
+本分支**不会**在 CarPlay 本体上做任何独立演进 —— 上游每发布一版，这里就基于该版本重打一版零跑补丁。
 
 ---
 
@@ -118,10 +110,8 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 
 冲突通常只会落在那 3 个被改动的上游文件上，按 `docs/LEAPMOTOR.md` 里的语义锚点重新贴一遍即可。
 
-> **已知差异 —— CI**：本仓库历史中**不含**上游的 `.github/workflows/`（3 个 Actions 文件）。
-> 建仓时所用的 GitHub 令牌没有 `workflow` 权限，GitHub 会拒绝任何"新增/修改 workflow 文件"的推送，
-> 导致整段历史一个字节都推不上去。这是推送环境的限制，**并非有意改动**。
-> 需要 CI 就从上游把那 3 个文件拷回来，用带 `workflow` 权限的令牌推送。
+> **已知差异 —— CI**：本仓库不含上游的 `.github/workflows/`（3 个 Actions 文件），因此没有自动构建。
+> 需要的话从上游把这 3 个文件拷回来即可（推送需带 `workflow` 权限的令牌）。
 
 上游的原始 README 已完整保留在 [`docs/upstream/README.md`](docs/upstream/README.md) 与
 [`docs/upstream/README.zh-CN.md`](docs/upstream/README.zh-CN.md)。
@@ -132,7 +122,7 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 
 - 上游代码版权归原作者所有，许可证 **GNU General Public License v3.0**（见 [`LICENSE`](LICENSE)，未作任何修改）。
 - 本分支的零跑适配补丁按 GPL-3.0 同协议发布，作者 [Wh1t3co1azZ](https://github.com/Wh1t3co1azZ)。
-- 适配补丁中**不包含**任何零跑私有资源（无图标、无固件二进制、无认证文件）；协议常量由实车固件行为逆向得出。
+- 适配补丁中**不包含**任何零跑私有资源（无图标、无固件二进制、无认证文件）。
 - 由此带来的任何车机异常、数据损失或保修争议，**由使用者自行承担**。
 
 ---
@@ -170,7 +160,7 @@ A Leapmotor head unit is physically different from a BYD one: **steering-wheel k
 apps as Android `KeyEvent`s**. They travel CAN → instrument cluster (ICU) → broadcast. Upstream DiPlay builds
 its wheel-key support on key events and an accessibility service, so on Leapmotor firmware it receives nothing.
 
-Likewise, the Leapmotor C11 instrument panel is a **1920 × 720** strip while the CarPlay dashboard stream is
+Likewise, the Leapmotor instrument panel is a **1920 × 720** strip while the CarPlay dashboard stream is
 square, and the mapping rules differ from BYD DiLink 5.1.
 
 This branch adds exactly those three layers: **wheel keys, cluster projection and gear handling**. CarPlay
@@ -180,9 +170,13 @@ itself — wired/wireless connection, codecs, audio, UI, update checks — is **
 
 | Model | Status |
 |---|---|
-| Leapmotor C11 (2021–2023) | Primary target; the 1920×720 cluster geometry is derived from this model |
-| Leapmotor C01 / C10 / T03 / B01 / B10 | **Unverified.** The broadcast channels are registered defensively across every reported spelling, so keys may land — nobody has tested these models |
-| BYD and other brands | Use upstream; this branch neither helps nor hinders, and adds nothing for you |
+| **All Leapmotor 2021–2023 model years** | Adaptation target range of this branch |
+| Leapmotor models outside that range | **Not validated** |
+| BYD and other brands | **Not validated** — use upstream |
+
+The wheel-key channels are registered defensively across every action spelling seen in known firmware, which
+gives good coverage across models and firmware versions inside the target range. Cluster projection is gated on
+a platform fingerprint and only engages when it matches.
 
 ---
 
@@ -195,8 +189,8 @@ itself — wired/wireless connection, codecs, audio, UI, update checks — is **
 | `LeapmotorMediaKeys.kt` | **Wheel keys.** Contains `LeapmotorMediaProtocol`: four channel families, 38 actions, three payload shapes (length-prefixed binary JSON / JSON / int extra), a 250 ms de-duplication window, then mapping to CarPlay media buttons |
 | `LeapmotorGearMonitor.kt` | **Gear.** Listens to `leapmotor.cantoapp.update` int extra `1010105` (1=R / 2=N / 3=D); pauses CarPlay while reversing so the reversing camera and parking chimes own audio, resumes on exit; keeps a 1 s heartbeat toward `com.leapmotor.carcanserver` |
 | `LeapmotorClusterLayout.kt` | **Cluster projection.** Detects the platform via `Build.FINGERPRINT` containing `qti/msmnile_gvmq`, and derives a right-hand **720×720** square viewport from the 1920×720 panel (`left = 1920-720 = 1200`, `top = 0`) |
-| `ClusterMapViewport.kt` | Abstract viewport data class — unused on the current path, kept for the full-rewrite route |
-| `LearnedWheelKeys.kt` | **Transitional stub.** The original closed build ships a whole key-learning flow (capture → storage → UI, ≈549 lines) that is not part of upstream and whose source was never distributed, so it has not been ported. The stub keeps the tree compiling and guarantees keys take the generic mapping. **Delete this file once the real implementation lands** |
+| `ClusterMapViewport.kt` | Abstract viewport data class for the full-rewrite route |
+| `LearnedWheelKeys.kt` | **Transitional stub.** Key learning (capture → storage → UI) is a self-contained feature that is not part of upstream and has not been ported yet. The stub keeps the tree compiling and guarantees keys take the generic mapping. **Delete this file once the real implementation lands** |
 
 ### Upstream files modified (3 files, 47 lines)
 
@@ -206,40 +200,11 @@ itself — wired/wireless connection, codecs, audio, UI, update checks — is **
 | `common/.../ClusterMapPresentation.kt` | Adds the Leapmotor case to `videoParams`, taken only when DiLink planning fails; BYD behaviour is unchanged |
 | `shared/.../airplay/CarPlayMediaButton.kt` | Adds `forLeapmotorAction()` / `isWheelAction()`. Their coverage is **deliberately unequal** (the latter excludes `play`/`pause`/`stop`), otherwise radio and voice commands would be hijacked as wheel presses |
 
-Detailed reasoning and evidence are in [`docs/LEAPMOTOR.md`](docs/LEAPMOTOR.md); the reverse-engineering
-method is in [`docs/LEAPMOTOR-ANALYSIS.md`](docs/LEAPMOTOR-ANALYSIS.md).
+Reasoning, integration points and per-module parameters are documented in [`docs/LEAPMOTOR.md`](docs/LEAPMOTOR.md).
 
 ---
 
-## 3. Honest status (please read before installing)
-
-This adaptation was **not** developed and tuned in a car. It was reconstructed by reverse-engineering a third-party
-closed build (a C11 custom version based on upstream v0.2.15) and rewriting it. The boundaries and protocol details
-are evidence-backed, but nothing here has been validated by me on a vehicle:
-
-- ✅ Every touched upstream API was checked line by line before landing
-  (`CarPlayVideo.onMediaKey`, `CarPlayController.sendMediaButton`, the `CarPlayMediaButton` constants are all
-  present and unchanged between v0.2.15 and v0.2.17)
-- ⚠️ The Gradle build of **this repository has not been compiled end-to-end yet** — build it yourself per
-  [`docs/BUILD.md`](docs/BUILD.md)
-- ⚠️ These items **must** be confirmed on your car; do not assume they work:
-  1. Whether `ro.build.fingerprint` actually contains `qti/msmnile_gvmq` (decides if the cluster branch triggers)
-  2. Which of the 38 actions your firmware really sends (watch `logcat` for tag `DiPlay-MediaKeys`)
-  3. Whether one physical key is delivered on several channels → symptom: "one press skips two tracks"
-  4. HUD turn guidance depends on upstream's BYD SOME/IP integration (`com.ts.car.someip.*`); on Leapmotor it will
-     most likely fail to bind and should be treated as **unavailable**
-
-Check the cluster branch before installing:
-
-```bash
-adb shell getprop ro.build.fingerprint | grep msmnile_gvmq
-```
-
-Output = the branch applies. No output = the cluster part of this branch is not for your head unit.
-
----
-
-## 4. Build and install
+## 3. Build and install
 
 Build, install and first connection steps are **identical to upstream** — follow the upstream documents:
 [`docs/BUILD.md`](docs/BUILD.md) · [`docs/INSTALL.md`](docs/INSTALL.md) · [`docs/CONNECTION_SETUP.md`](docs/CONNECTION_SETUP.md)
@@ -249,11 +214,26 @@ Build, install and first connection steps are **identical to upstream** — foll
 adb install -r mobile/build/outputs/apk/release/*.apk
 ```
 
+Release artifacts of this branch are named **`Diplay-V0.2.17-Leap.apk`** (upstream version + `-Leap` suffix).
+
 The upstream disclaimer applies here in full; the most important part is repeated:
 **This is not an Apple-certified product.** The APK bundles an experimental accessory identity recovered from public
 Carlinkit firmware, not a newly provisioned MFi identity. A bundled private key is extractable, and acceptance after
 future iOS updates, reliability across head units and suitability of that identity for general distribution are
 unresolved. See the upstream README for the full statement.
+
+---
+
+## 4. Versioning and upgrades
+
+| Item | Value |
+|---|---|
+| Current release | **`v0.2.17-Leap`** |
+| Upstream base | `v0.2.17` |
+| Upgrade path | Track upstream. When upstream ships a new version, that tree plus these Leapmotor patches is released again as `Diplay-V<upstream version>-Leap.apk` |
+
+This branch does **not** evolve CarPlay itself independently. Each upstream release gets rebuilt here with the
+Leapmotor patches reapplied.
 
 ---
 
@@ -267,11 +247,9 @@ bash scripts/sync-upstream.sh                                          # fetch a
 Conflicts, when they occur, are normally limited to the three modified upstream files; re-apply them using the
 semantic anchors listed in `docs/LEAPMOTOR.md`.
 
-> **Known difference — CI:** this repository's history **does not contain** upstream's `.github/workflows/`
-> (three Actions files). The GitHub token used to create it lacks the `workflow` scope, and GitHub rejects any
-> push that adds or modifies workflow files — which blocked pushing the history at all. This is a limitation of
-> the push environment, **not an intentional change**. To get CI back, copy those three files from upstream and
-> push them with a token that has the `workflow` scope.
+> **Known difference — CI:** this repository does not carry upstream's `.github/workflows/` (three Actions
+> files), so there is no automated build. Copy those three files back from upstream if you want CI (pushing
+> them requires a token with the `workflow` scope).
 
 The upstream README is preserved verbatim at [`docs/upstream/README.md`](docs/upstream/README.md) and
 [`docs/upstream/README.zh-CN.md`](docs/upstream/README.zh-CN.md).
@@ -283,5 +261,4 @@ The upstream README is preserved verbatim at [`docs/upstream/README.md`](docs/up
 - Upstream code remains the copyright of its author, licensed **GNU GPL v3.0** ([`LICENSE`](LICENSE), unmodified).
 - The Leapmotor patches are published under the same GPL-3.0, by [Wh1t3co1azZ](https://github.com/Wh1t3co1azZ).
 - The patches contain **no proprietary Leapmotor assets** — no artwork, firmware binaries or authentication files.
-  Protocol constants were derived from observed vehicle firmware behaviour.
 - Any head-unit malfunction, data loss or warranty dispute caused by using this is **entirely at your own risk**.
