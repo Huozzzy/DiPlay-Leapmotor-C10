@@ -618,6 +618,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         applyWindowAppearance()
         // A pending assignment belongs to the widgets being replaced, never to another page.
         if (!appearanceOnly) cancelKeyLearning()
+        // The backup server lives only while its page is shown, however the driver left it.
+        if (page != "backup" && backupServer != null) stopBackupServer()
         val focusSnapshot = if (appearanceOnly) {
             currentFocus?.let { focused ->
                 FocusSnapshot(
@@ -2292,6 +2294,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 export = { SettingsBackupCodec.export(this, version()) },
                 import = { SettingsBackupCodec.import(this, it) },
             )
+            created.onIdle = {
+                runOnUiThread {
+                    if (isFinishing || isDestroyed || backupServer !== created) return@runOnUiThread
+                    stopBackupServer()
+                    page = "about"
+                    render()
+                }
+            }
             created.onImported = { outcome ->
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
