@@ -4634,6 +4634,7 @@ class CarPlayHostActivity : ComponentActivity() {
             videoPacingDelayMillis = if (smoothVideo) smoothVideoDelayMillis(fps) else 0,
             mainVideoFrameRate = fps,
             vendorLowLatencyDecoder = AirPlayPersistence.loadLowLatencyDecoder(this),
+            mtkDecoderTuningEnabled = AirPlayPersistence.loadMtkDecoderTuning(this),
         )
     }
 
