@@ -118,6 +118,11 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 
 冲突通常只会落在那 3 个被改动的上游文件上，按 `docs/LEAPMOTOR.md` 里的语义锚点重新贴一遍即可。
 
+> **已知差异 —— CI**：本仓库历史中**不含**上游的 `.github/workflows/`（3 个 Actions 文件）。
+> 建仓时所用的 GitHub 令牌没有 `workflow` 权限，GitHub 会拒绝任何"新增/修改 workflow 文件"的推送，
+> 导致整段历史一个字节都推不上去。这是推送环境的限制，**并非有意改动**。
+> 需要 CI 就从上游把那 3 个文件拷回来，用带 `workflow` 权限的令牌推送。
+
 上游的原始 README 已完整保留在 [`docs/upstream/README.md`](docs/upstream/README.md) 与
 [`docs/upstream/README.zh-CN.md`](docs/upstream/README.zh-CN.md)。
 
@@ -261,6 +266,12 @@ bash scripts/sync-upstream.sh                                          # fetch a
 
 Conflicts, when they occur, are normally limited to the three modified upstream files; re-apply them using the
 semantic anchors listed in `docs/LEAPMOTOR.md`.
+
+> **Known difference — CI:** this repository's history **does not contain** upstream's `.github/workflows/`
+> (three Actions files). The GitHub token used to create it lacks the `workflow` scope, and GitHub rejects any
+> push that adds or modifies workflow files — which blocked pushing the history at all. This is a limitation of
+> the push environment, **not an intentional change**. To get CI back, copy those three files from upstream and
+> push them with a token that has the `workflow` scope.
 
 The upstream README is preserved verbatim at [`docs/upstream/README.md`](docs/upstream/README.md) and
 [`docs/upstream/README.zh-CN.md`](docs/upstream/README.zh-CN.md).
