@@ -5168,6 +5168,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     appendLine(StartupDiagnosticSnapshot.report(appContext))
                     appendLine("Startup settings: openAfterBoot=${AirPlayPersistence.loadAutoStartOnBoot(appContext)} " +
                         "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
+                    appendLine(WheelKeyService.report(appContext))
                     appendLine()
                     appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
                     appendLine()
