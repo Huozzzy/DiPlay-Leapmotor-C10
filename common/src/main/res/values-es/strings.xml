@@ -783,4 +783,10 @@
     <string name="settings_ambient_album">Seguir la portada del álbum</string>
     <string name="settings_ambient_album_description">Usa el color de la portada o colores cercanos disponibles del vehículo. Las portadas grises, negras o ausentes usan los 31 colores; las mayormente blancas pueden usar blanco o blanco frío.</string>
     <string name="bluetooth_connections_not_real">El Bluetooth de Android de esta unidad principal indica una conexión, pero nada llega al iPhone: incluso la conexión a un servicio que no existe tiene éxito. Aquí el Bluetooth lo gestiona un módulo propio del fabricante que las apps no pueden usar, por lo que CarPlay inalámbrico no puede funcionar en esta unidad principal. Prueba una conexión USB.</string>
+    <string name="settings_cluster_speedometer">Velocímetro del cluster (experimental)</string>
+    <string name="settings_cluster_speedometer_description">Muestra la velocidad real mediante ADB autorizado. Se oculta si el dato no está disponible o queda desactualizado. Los cambios se aplican al momento.</string>
+    <string name="settings_cluster_speedometer_horizontal">Posición horizontal del velocímetro</string>
+    <string name="settings_cluster_speedometer_vertical">Posición vertical del velocímetro</string>
+    <string name="settings_cluster_speedometer_size">Tamaño del velocímetro</string>
+    <string name="settings_cluster_speedometer_opacity">Opacidad del velocímetro</string>
 </resources>
