@@ -1,6 +1,6 @@
 # DiPlay next release notes
 
-Changes through DiPlay 0.2.17 are documented in [0.2.17 release notes](RELEASE-NOTES-0.2.17.md). Measured checks are in [VALIDATION.md](VALIDATION.md). Device acceptance and remaining failure families are tracked in [connection reliability validation](CONNECTION_RELIABILITY.md).
+Changes through DiPlay 0.2.18 are documented in [0.2.18 release notes](RELEASE-NOTES-0.2.18.md). Measured checks are in [VALIDATION.md](VALIDATION.md). Device acceptance and remaining failure families are tracked in [connection reliability validation](CONNECTION_RELIABILITY.md).
 
 Add future unreleased changes here.
 
@@ -67,3 +67,4 @@ Add future unreleased changes here.
 - About now opens inside Settings like the other categories. On wide screens the category rail stays visible, and About is the last entry in it. The page uses the same title style. [#597](https://github.com/shihabal3amri/DiPlay/pull/597)
 - Installing an update no longer opens Android's "install unknown apps" page first, which some head units answer with "Not supported yet". With more than one installer, such as MT Manager, DiPlay asks which one to use, and it uses the public Downloads copy when that still matches the verified file. The report records `lastInstall=`. [#593](https://github.com/shihabal3amri/DiPlay/pull/593)
 - **Settings → About → Back up or restore on a phone** shows a QR code for a page on the head unit, where a phone exports the settings as a file or imports one. Only listed settings travel: pairing keys, authentication, and the car's hotspot name and passphrase never do. The page stops when it is left or after 10 minutes without use. [#598](https://github.com/shihabal3amri/DiPlay/pull/598)
+No unreleased changes are recorded yet. Add future unreleased changes here.
