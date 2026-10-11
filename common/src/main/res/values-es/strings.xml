@@ -796,4 +796,6 @@
     <string name="settings_hotspot_name_non_english">Con caracteres chinos u otros no ingleses en el nombre, CarPlay puede quedarse en «Preparando CarPlay…»: algunas unidades emiten ese nombre de una forma que el iPhone no encuentra. Si pasa, cambia el nombre del punto de acceso del coche a letras inglesas y números.</string>
     <string name="settings_speech_without_low_rates">Voz de navegación más clara por USB (experimental)</string>
     <string name="settings_speech_without_low_rates_description">Por USB, el iPhone puede enviar las indicaciones de navegación y las respuestas habladas de Siri con calidad telefónica de 8 kHz. Esta opción deja de ofrecer 8 y 16 kHz para ese audio y el iPhone elige una frecuencia mayor. Si las indicaciones dejan de oírse, desactívala. Reconecta CarPlay.</string>
+    <string name="settings_fce_cluster_guidance">Indicaciones en el cuadro FCE (experimental)</string>
+    <string name="settings_fce_cluster_guidance_description">Muestra las flechas de CarPlay y la distancia al próximo giro en la vista de navegación del cuadro de instrumentos en unidades FCE, escribiendo en el servicio del vehículo de la unidad. Probado solo en un coche; desactívalo si el cuadro se comporta de forma inesperada.</string>
 </resources>
