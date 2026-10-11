@@ -226,6 +226,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var availableUpdate: UpdateRelease? = null
     private var updateSavedPath: String? = null
     private var updateSavedUri: Uri? = null
+    /** Runs the check of the public update copy; tests run it inline. */
+    internal var updateInstallWorker: (Runnable) -> Unit = { Thread(it, "diplay-update-install").start() }
     @Volatile private var updateStage = UpdateStage.IDLE
     @Volatile private var backupServer: SettingsBackupServer? = null
     @Volatile private var backupEndpoint: SettingsBackupEndpoint? = null
@@ -2485,8 +2487,19 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun installApk(file: File) {
         // The public copy lets file managers such as MT Manager open the APK. The private provider URI is the fallback,
         // including when the driver deleted the public copy.
-        // The public copy is outside the app's control, so it must still match the verified file.
-        val publicUri = updateSavedUri?.takeIf { sameContent(it, file) }
+        // The public copy is outside the app's control, so it must still match the verified file. Hashing two
+        // APKs takes seconds on a slow head unit, so it runs off the main thread.
+        val savedUri = updateSavedUri
+        val generation = updateGeneration
+        updateInstallWorker(Runnable {
+            val publicUri = savedUri?.takeIf { sameContent(it, file) }
+            runOnUiThread {
+                if (generation == updateGeneration && !isFinishing && !isDestroyed) startInstaller(file, publicUri)
+            }
+        })
+    }
+
+    private fun startInstaller(file: File, publicUri: Uri?) {
         val uri = publicUri ?: FileProvider.getUriForFile(this, "$packageName.update-apks", file)
         val view = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
@@ -2503,7 +2516,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         } catch (failure: RuntimeException) {
             Log.w("DiPlay-Update", "install failed to start: $outcome", failure)
             UpdateAvailability.recordInstall(applicationContext, System.currentTimeMillis(), "$outcome failed=${failure.javaClass.simpleName}")
-            throw failure
+            updateMessage = getString(R.string.update_failed)
+            render()
         }
     }
 
