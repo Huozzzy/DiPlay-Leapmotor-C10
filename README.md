@@ -173,9 +173,7 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 > | Scope of my contribution | **Leapmotor adaptation only**. Everything else is the work of the upstream author and contributors |
 > | Base version | Upstream `v0.2.18` |
 >
-> If you do not own a Leapmotor, use upstream instead: features, compatibility, security and updates are all
-> handled there — star it and file issues there. Leapmotor-specific questions belong here, and please do **not**
-> take this branch to the upstream author.
+> Leapmotor-specific questions belong here, and please do **not** take this branch to the upstream author.
 
 ---
 
