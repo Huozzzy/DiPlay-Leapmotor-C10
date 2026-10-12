@@ -102,6 +102,15 @@ export ANDROID_KEY_ALIAS=diplay-leap
 export ANDROID_KEY_PASSWORD=<key password>
 ```
 
+此外还需要**本地 CarPlay 配件身份**（同样不含在仓库里，做法见上游 `docs/BUILD.md`）：
+
+```bash
+# 该目录下放 offline-mfi/identity.pk8 与 offline-mfi/certificate.p7b
+export DIPLAY_AUTH_ASSETS_DIR=/path/to/runtime-assets
+```
+
+不设置它构建也能通过，但打出的包装到车机上会提示**「无法加载 CarPlay 认证」**，无法连接 iPhone。
+
 本分支的发布产物名为 **`Diplay-V<上游版本>-Leap21_23.apk`**，当前为 **`Diplay-V0.2.18-Leap21_23.apk`**。
 包名、`versionName`、`versionCode` **全部沿用上游**（`com.shihab.diplay` / `0.2.18` / `37`），本分支不改动。
 
@@ -257,6 +266,17 @@ export ANDROID_KEYSTORE_PASSWORD=<store password>
 export ANDROID_KEY_ALIAS=diplay-leap
 export ANDROID_KEY_PASSWORD=<key password>
 ```
+
+A **local CarPlay accessory identity** is also required (also never distributed with the sources;
+see upstream `docs/BUILD.md`):
+
+```bash
+# this directory must contain offline-mfi/identity.pk8 and offline-mfi/certificate.p7b
+export DIPLAY_AUTH_ASSETS_DIR=/path/to/runtime-assets
+```
+
+Without it the build still succeeds, but the APK cannot connect an iPhone — it reports that
+CarPlay authentication could not be loaded.
 
 Release artifacts are named **`Diplay-V<upstream version>-Leap21_23.apk`**, currently **`Diplay-V0.2.18-Leap21_23.apk`**.
 Package name, `versionName` and `versionCode` are **all upstream's** (`com.shihab.diplay` / `0.2.18` / `37`);
