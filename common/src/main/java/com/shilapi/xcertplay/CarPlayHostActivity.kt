@@ -1408,8 +1408,14 @@ class CarPlayHostActivity : ComponentActivity() {
             // on the press. The release is swallowed rather than passed on, or BYD's own player would
             // receive an unpaired key.
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                val sent = controller?.sendMediaButton(mediaPress) == true
-                appendLog("Media: wheel key ${event.keyCode} -> CarPlay $mediaPress sent=$sent")
+                // Leapmotor 2024+: the same press also arrives as the head unit's own broadcast, and
+                // only one of the two may reach CarPlay (see Leapmotor24WheelKeys.claim).
+                if (Leapmotor24WheelKeys.claimAndroidKey(mediaPress)) {
+                    val sent = controller?.sendMediaButton(mediaPress) == true
+                    appendLog("Media: wheel key ${event.keyCode} -> CarPlay $mediaPress sent=$sent")
+                } else {
+                    appendLog("Media: wheel key ${event.keyCode} duplicate suppressed")
+                }
             }
             return true
         }
@@ -4996,6 +5002,10 @@ class CarPlayHostActivity : ComponentActivity() {
         resetSidePanel() // a new session starts without the side panel
         updateClusterMapShown()
         CarPlayMediaKeys.attach(this, next)
+        // Leapmotor 2024+: the wheel speaks as one broadcast alongside ordinary Android key events,
+        // and vehicle data is pulled from the car's own service rather than broadcast as CAN frames.
+        Leapmotor24WheelKeys.attach(this, next)
+        Leapmotor24CarData.attach(this)
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
@@ -5385,6 +5395,8 @@ class CarPlayHostActivity : ComponentActivity() {
         val oldController = controller
         val oldSink = sink
         CarPlayMediaKeys.detach(oldController)
+        Leapmotor24WheelKeys.detach(oldController)
+        Leapmotor24CarData.detach()
         CarPlayBackgroundSession.clear(oldController, keepOwner = true)
         controller = null
         oldSink?.let(retiringSinks::add)
@@ -5580,6 +5592,8 @@ class CarPlayHostActivity : ComponentActivity() {
         val oldController = controller
         val oldSink = sink
         CarPlayMediaKeys.detach(oldController)
+        Leapmotor24WheelKeys.detach(oldController)
+        Leapmotor24CarData.detach()
         CarPlayBackgroundSession.clear(oldController)
         controller = null
         oldSink?.let(retiringSinks::add)

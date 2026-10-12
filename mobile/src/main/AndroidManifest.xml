@@ -32,6 +32,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name="com.shilapi.xcertplay.Leapmotor24ConfigReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.shihab.diplay.leapmotor24.CONFIGURE" />
+            </intent-filter>
+        </receiver>
+
         <service android:name="com.shilapi.xcertplay.shared.MyCarAppService" tools:node="remove" />
         <meta-data android:name="androidx.car.app.minCarApiLevel" tools:node="remove" />
     </application>

@@ -522,7 +522,13 @@ internal class CarPlayMediaCallback(
         val index = CarPlayMediaButton.forKeyCode(event.keyCode, experimentalDiLink3Keys())
             ?: return super.onMediaButtonEvent(mediaButtonIntent)
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-            send(index, KeyEvent.keyCodeToString(event.keyCode))
+            // Leapmotor's 2024+ head units deliver one wheel press twice: once as their own
+            // broadcast and once here. Whichever arrives first wins the shared window.
+            if (Leapmotor24WheelKeys.claimAndroidKey(index)) {
+                send(index, KeyEvent.keyCodeToString(event.keyCode))
+            } else {
+                android.util.Log.i(TAG, "media key ${event.keyCode} duplicate suppressed")
+            }
         }
         return true
     }
@@ -531,4 +537,8 @@ internal class CarPlayMediaCallback(
     override fun onPause() = send(CarPlayMediaButton.PAUSE, "pause")
     override fun onSkipToNext() = send(CarPlayMediaButton.NEXT, "next")
     override fun onSkipToPrevious() = send(CarPlayMediaButton.PREVIOUS, "previous")
+
+    private companion object {
+        const val TAG = "DiPlay-MediaKeys"
+    }
 }
