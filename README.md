@@ -51,7 +51,6 @@ CAN 总线 → 仪表控制器（ICU）→ 广播 的链路。上游 DiPlay 的�
 |---|---|
 | **零跑 2021–2023 款全部车型** | 本分支的适配目标范围 |
 | **零跑 2024–2027 款全部车型** | 本分支的适配目标范围 |
-| BYD 及其它品牌车机 | **未做验证**，请使用上游仓库 |
 
 方控的广播通道是按"广撒网"方式注册的，覆盖已知固件里出现过的全部拼写形式，因此在目标范围内的不同车型、
 不同固件版本上具备较高的命中率。投仪表部分依赖车机平台指纹识别，命中后才会生效。
@@ -171,9 +170,7 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 > | Scope of my contribution | **Leapmotor adaptation only** (see below). Everything else is the work of the upstream author and contributors |
 > | Base version | Upstream `v0.2.18` |
 >
-> If you do not own a Leapmotor, use upstream instead: features, compatibility, security and updates are all
-> handled there — star it and file issues there. Leapmotor-specific questions belong here, and please do **not**
-> take this branch to the upstream author.
+> Leapmotor-specific questions belong here, and please do **not** take this branch to the upstream author.
 
 ---
 
@@ -210,8 +207,7 @@ itself — wired/wireless connection, codecs, audio, UI, update checks — is **
 | Model | Status |
 |---|---|
 | **All Leapmotor 2021–2023 model years** | Adaptation target range of this branch |
-| Leapmotor models outside that range | **Not validated** |
-| BYD and other brands | **Not validated** — use upstream |
+| **All Leapmotor 2024–2027 model years** | Adaptation target range of this branch |
 
 The wheel-key channels are registered defensively across every action spelling seen in known firmware, which
 gives good coverage across models and firmware versions inside the target range. Cluster projection is gated on

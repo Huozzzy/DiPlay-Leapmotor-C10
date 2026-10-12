@@ -6,8 +6,8 @@
 > Upstream: [shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay) (GPL-3.0).
 > This document covers the **only original part** of this repository: the Leapmotor patches.
 
-适配车型：**零跑 2021–2023 款全部车型**。其它车型与其它品牌车机未做验证。
-Target range: **all Leapmotor 2021–2023 model years**. Anything else is unvalidated.
+适配车型：**零跑 2021–2023 款全部车型**。
+Target range: **all Leapmotor 2021–2023 model years**.
 
 ---
 
