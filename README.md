@@ -22,7 +22,20 @@
 
 ---
 
-## 1. 这个分支做了什么
+## 1. 先选对你的 APK
+
+零跑在 2024 款换过车机软件架构，两代车机给第三方 App 的接口**不是一套东西**，因此每个版本发布**两个 APK**：
+
+| 产物 | 分支 | 适用车型 |
+|---|---|---|
+| **`Diplay-V<上游版本>-Leap21_23.apk`** | **本分支** | 零跑 **2021–2023** 款全部车型 |
+| `Diplay-V<上游版本>-Leap24_27.apk` | `leapmotor-24-27` | 零跑 **2024–2027** 款全部车型 |
+
+两个 APK 的**包名、versionName、versionCode 都沿用上游**（`com.shihab.diplay` / `0.2.18` / `37`），所以一台车机上只能装其中一个，**按车型年份挑对应的那个**。装错版本方控不会有反应。
+
+---
+
+## 2. 这个分支做了什么
 
 零跑车机与 BYD 车机的物理层完全不同：**方向盘按键不会以 Android `KeyEvent` 的形式投递给第三方 App**，而是走
 CAN 总线 → 仪表控制器（ICU）→ 广播 的链路。上游 DiPlay 的方控建立在 KeyEvent / 无障碍服务之上，在零跑车机上收不到任何东西。
@@ -45,7 +58,7 @@ CAN 总线 → 仪表控制器（ICU）→ 广播 的链路。上游 DiPlay 的�
 
 ---
 
-## 2. 零跑适配包含什么
+## 3. 零跑适配包含什么
 
 ### 新增文件
 
@@ -71,7 +84,7 @@ CAN 总线 → 仪表控制器（ICU）→ 广播 的链路。上游 DiPlay 的�
 
 ---
 
-## 3. 构建与安装
+## 4. 构建与安装
 
 构建、安装、首次连接的流程与上游**完全一致**，请照上游文档做：
 [`docs/BUILD.md`](docs/BUILD.md) · [`docs/INSTALL.md`](docs/INSTALL.md) · [`docs/CONNECTION_SETUP.md`](docs/CONNECTION_SETUP.md)
@@ -90,7 +103,7 @@ export ANDROID_KEY_ALIAS=diplay-leap
 export ANDROID_KEY_PASSWORD=<key password>
 ```
 
-本分支的发布产物统一命名为 **`Diplay-V<上游版本>-Leap.apk`**，当前为 **`Diplay-V0.2.18-Leap.apk`**。
+本分支的发布产物名为 **`Diplay-V<上游版本>-Leap21_23.apk`**，当前为 **`Diplay-V0.2.18-Leap21_23.apk`**。
 包名、`versionName`、`versionCode` **全部沿用上游**（`com.shihab.diplay` / `0.2.18` / `37`），本分支不改动。
 
 上游的原始免责声明同样适用于本分支，这里只摘最关键的一条：
@@ -99,19 +112,19 @@ export ANDROID_KEY_PASSWORD=<key password>
 
 ---
 
-## 4. 版本与升级策略
+## 5. 版本与升级策略
 
 | 项 | 值 |
 |---|---|
 | 当前发布版本 | **`v0.2.18-Leap`** |
 | 对应上游基线 | `v0.2.18` |
-| 升级方式 | 跟随上游。上游发布新版本后，取新版本代码 + 本分支的零跑补丁重新发布，版本号同步为 `Diplay-V<上游版本>-Leap.apk` |
+| 升级方式 | 跟随上游。上游发布新版本后，两个分支各自重打补丁，产出 `Diplay-V<上游版本>-Leap21_23.apk` 与 `Diplay-V<上游版本>-Leap24_27.apk` |
 
 本分支**不会**在 CarPlay 本体上做任何独立演进 —— 上游每发布一版，这里就基于该版本重打一版零跑补丁。
 
 ---
 
-## 5. 与上游保持同步
+## 6. 与上游保持同步
 
 ```bash
 git remote add upstream https://github.com/shihabal3amri/DiPlay.git   # 只需一次
@@ -128,7 +141,7 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 
 ---
 
-## 6. 许可与归属
+## 7. 许可与归属
 
 - 上游代码版权归原作者所有，许可证 **GNU General Public License v3.0**（见 [`LICENSE`](LICENSE)，未作任何修改）。
 - 本分支的零跑适配补丁按 GPL-3.0 同协议发布，作者 [Wh1t3co1azZ](https://github.com/Wh1t3co1azZ)。
@@ -164,7 +177,23 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 
 ---
 
-## 1. What this branch does
+## 1. Pick the right APK first
+
+Leapmotor changed its head-unit software architecture for the 2024 model year. The two generations expose
+**different interfaces to third-party apps**, so every release ships **two APKs**:
+
+| Artifact | Branch | Models |
+|---|---|---|
+| **`Diplay-V<upstream version>-Leap21_23.apk`** | **this branch** | Leapmotor **2021–2023** model years |
+| `Diplay-V<upstream version>-Leap24_27.apk` | `leapmotor-24-27` | Leapmotor **2024–2027** model years |
+
+Both keep **upstream's** package name, `versionName` and `versionCode` (`com.shihab.diplay` / `0.2.18` / `37`),
+so only one can be installed on a head unit — **pick the one matching your model year**. Installing the wrong
+one means the wheel keys simply do nothing.
+
+---
+
+## 2. What this branch does
 
 A Leapmotor head unit is physically different from a BYD one: **steering-wheel keys never reach third-party
 apps as Android `KeyEvent`s**. They travel CAN → instrument cluster (ICU) → broadcast. Upstream DiPlay builds
@@ -190,7 +219,7 @@ a platform fingerprint and only engages when it matches.
 
 ---
 
-## 2. What the Leapmotor part contains
+## 3. What the Leapmotor part contains
 
 ### New files — all under `common/src/main/java/com/shilapi/xcertplay/`
 
@@ -214,7 +243,7 @@ Reasoning, integration points and per-module parameters are documented in [`docs
 
 ---
 
-## 3. Build and install
+## 4. Build and install
 
 Build, install and first connection steps are **identical to upstream** — follow the upstream documents:
 [`docs/BUILD.md`](docs/BUILD.md) · [`docs/INSTALL.md`](docs/INSTALL.md) · [`docs/CONNECTION_SETUP.md`](docs/CONNECTION_SETUP.md)
@@ -233,7 +262,7 @@ export ANDROID_KEY_ALIAS=diplay-leap
 export ANDROID_KEY_PASSWORD=<key password>
 ```
 
-Release artifacts are named **`Diplay-V<upstream version>-Leap.apk`**, currently **`Diplay-V0.2.18-Leap.apk`**.
+Release artifacts are named **`Diplay-V<upstream version>-Leap21_23.apk`**, currently **`Diplay-V0.2.18-Leap21_23.apk`**.
 Package name, `versionName` and `versionCode` are **all upstream's** (`com.shihab.diplay` / `0.2.18` / `37`);
 this branch does not change them.
 
@@ -245,20 +274,20 @@ unresolved. See the upstream README for the full statement.
 
 ---
 
-## 4. Versioning and upgrades
+## 5. Versioning and upgrades
 
 | Item | Value |
 |---|---|
 | Current release | **`v0.2.18-Leap`** |
 | Upstream base | `v0.2.18` |
-| Upgrade path | Track upstream. When upstream ships a new version, that tree plus these Leapmotor patches is released again as `Diplay-V<upstream version>-Leap.apk` |
+| Upgrade path | Track upstream. When upstream ships a new version, both branches are rebuilt, producing `Diplay-V<upstream version>-Leap21_23.apk` and `Diplay-V<upstream version>-Leap24_27.apk` |
 
 This branch does **not** evolve CarPlay itself independently. Each upstream release gets rebuilt here with the
 Leapmotor patches reapplied.
 
 ---
 
-## 5. Keeping up with upstream
+## 6. Keeping up with upstream
 
 ```bash
 git remote add upstream https://github.com/shihabal3amri/DiPlay.git   # once
@@ -277,7 +306,7 @@ The upstream README is preserved verbatim at [`docs/upstream/README.md`](docs/up
 
 ---
 
-## 6. Licensing and attribution
+## 7. Licensing and attribution
 
 - Upstream code remains the copyright of its author, licensed **GNU GPL v3.0** ([`LICENSE`](LICENSE), unmodified).
 - The Leapmotor patches are published under the same GPL-3.0, by [Wh1t3co1azZ](https://github.com/Wh1t3co1azZ).
