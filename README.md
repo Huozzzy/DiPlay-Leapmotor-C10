@@ -45,11 +45,7 @@
 
 ### 适配车型范围
 
-| 车型 | 状态 |
-|---|---|
-| **零跑 2024–2027 款全部车型** | 本分支的适配目标范围 |
-| 零跑 2021–2023 款 | **不适用**，请用 `Diplay-V<版本>-Leap21_23.apk` |
-| BYD 及其它品牌车机 | **未做验证**，请使用上游仓库 |
+本分支的适配目标是 **零跑 2024–2027 款全部车型**。
 
 ### 这一代特有的难点：一次按键来两遍
 
@@ -212,11 +208,7 @@ itself — wired/wireless connection, codecs, audio, UI, update checks — is **
 
 ### Vehicle scope
 
-| Model | Status |
-|---|---|
-| **Leapmotor 2024–2027 model years** | Adaptation target range of this branch |
-| Leapmotor 2021–2023 | **Not applicable** — use `Diplay-V<version>-Leap21_23.apk` |
-| BYD and other brands | **Not validated** — use upstream |
+This branch targets **all Leapmotor 2024–2027 model years**.
 
 ### The quirk of this generation: every press arrives twice
 
