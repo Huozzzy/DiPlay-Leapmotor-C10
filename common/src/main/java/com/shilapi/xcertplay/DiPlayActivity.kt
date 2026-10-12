@@ -365,7 +365,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         languagePreferenceAtCreate = AppLocale.preference(this)
         com.shilapi.xcertplay.hud.BydNavigationOutputs.onAppOpened(applicationContext)
         PhoneAudioRoute.attach(applicationContext)
-        WheelKeyService.restoreIfNeeded(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= 28) {
             window.attributes = window.attributes.apply {
@@ -681,7 +680,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 "connection" -> connectionSetup(content)
                 "setup" -> setupGuide(content)
                 "settings" -> settingsCategoryContent(content)
-                "about" -> about(content)
                 "backup" -> backup(content)
                 else -> home(content)
             }
@@ -780,11 +778,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         when {
             page == "backup" -> {
                 stopBackupServer()
-                page = "about"
-            }
-            page == "about" -> {
                 page = "settings"
-                settingsCategory = SettingsCategory.OVERVIEW
+                settingsCategory = SettingsCategory.ABOUT
             }
             page == "setup" && setupStep > SetupGuide.STEP_CAR -> setupStep--
             page == "setup" -> {
@@ -2298,7 +2293,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 runOnUiThread {
                     if (isFinishing || isDestroyed || backupServer !== created) return@runOnUiThread
                     stopBackupServer()
-                    page = "about"
+                    page = "settings"
+                    settingsCategory = SettingsCategory.ABOUT
                     render()
                 }
             }
@@ -5157,8 +5153,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     appendLine("Authentication: local experimental beta identity; no remote fallback")
                     appendLine("CarPlay setup: ${if (setupError == null) "ready" else "authentication unavailable"}")
                     appendLine("Saved video preference (may differ from active session): ${if (AirPlayPersistence.loadHevcEnabled(appContext)) "HEVC" else "H.264"}; ${AirPlayPersistence.loadFps(appContext)} fps")
-                    appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
                     appendLine("Media-key audio focus: ${if (AirPlayPersistence.loadDisableMediaKeyAudioFocus(appContext)) "disabled" else "enabled"}")
+                    appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
                     appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
                     appendLine("Saved resolution preference (may differ from active session): ${AirPlayPersistence.loadDisplayScalePercent(appContext)}%")
                     appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
