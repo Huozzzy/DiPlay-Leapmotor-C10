@@ -1,4 +1,4 @@
-# DiPlay — 零跑（Leapmotor）2021–2023 适配分支
+# DiPlay — 零跑（Leapmotor）2021–2027 适配分支
 
 **简体中文 · [English below](#english)**
 
