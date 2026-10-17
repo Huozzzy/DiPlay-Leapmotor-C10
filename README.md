@@ -151,8 +151,8 @@ bash scripts/sync-upstream.sh                                          # 抓取�
 本仓库的做法是**整棵树换成上游新版本，再把零跑那一小摞改动按语义锚点重新贴回去**；
 脚本只负责取上游与报差异，重贴动作照 [`docs/LEAPMOTOR24.md`](docs/LEAPMOTOR24.md) 的描述手工完成。
 
-> 上游的 `.github/workflows/` 三个 Actions 文件随上游一并保留，CI 会跑单元测试、lint 与 debug 构建。
-> 它不构建 release，因此不需要签名与配件身份。
+> **已知差异 —— CI**：本仓库不含上游的 `.github/workflows/`（3 个 Actions 文件），因此没有自动构建。
+> 推这些文件需要带 `workflow` 权限的令牌；拿到后从上游把这 3 个文件拷回来即可。
 
 上游的原始 README 归档在 [`docs/upstream/README.md`](docs/upstream/README.md) 与
 [`docs/upstream/README.zh-CN.md`](docs/upstream/README.zh-CN.md)。
@@ -336,8 +336,9 @@ unrelated conflicts. This repository instead **replaces the whole tracked tree w
 re-applies the small stack of Leapmotor hunks on top**, using the semantic anchors in `docs/LEAPMOTOR24.md`.
 The script only fetches and reports; the re-application itself is manual.
 
-> Upstream's three `.github/workflows/` files are kept, so CI runs the unit tests, lint and a debug build.
-> It does not build release, so no signing or accessory identity is needed there.
+> **Known difference — CI:** this repository does not carry upstream's `.github/workflows/` (three Actions
+> files), so there is no automated build. Pushing them requires a token with the `workflow` scope; copy them
+> back from upstream once you have one.
 
 The upstream README is preserved at [`docs/upstream/README.md`](docs/upstream/README.md) and
 [`docs/upstream/README.zh-CN.md`](docs/upstream/README.zh-CN.md).
