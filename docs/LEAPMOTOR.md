@@ -1,13 +1,16 @@
 # 零跑适配技术说明 / Leapmotor adaptation notes
 
-上游：[shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay)（GPL-3.0）。
+上游：[shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay)（GPL-3.0），当前基线 `v0.2.20`。
 本文件描述本仓库**唯一原创的部分**：零跑适配补丁。源文件清单见 [`../README.md`](../README.md)。
 
-> Upstream: [shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay) (GPL-3.0).
+> Upstream: [shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay) (GPL-3.0), current base `v0.2.20`.
 > This document covers the **only original part** of this repository: the Leapmotor patches.
 
 适配车型：**零跑 2021–2023 款全部车型**。
 Target range: **all Leapmotor 2021–2023 model years**.
+
+同步时的具体做法与历次发布记录见 [`RELEASES.md`](RELEASES.md)。
+See [`RELEASES.md`](RELEASES.md) for how a sync is done and for the release history.
 
 ---
 
@@ -168,6 +171,33 @@ val videoParams = when {
 | `shared/.../airplay/CarPlayMediaButton.kt` | 低 | 纯追加两个函数，几乎不会冲突 |
 | `common/.../ClusterMapPresentation.kt` | 中 | `plan == null` 的判定结构稳定，按语义重新贴即可 |
 | `common/.../CarPlayHostActivity.kt` | 中 | 上游改动较频繁，**用语义锚点，不要按行号** |
+
+### 不要 merge，直接换树
+
+本仓库的历史与上游**不共享祖先**（建仓时是重新导入的），`git merge upstream/...` 会把每个文件都判成双方改动：
+v0.2.18 → v0.2.20 那次是 140 个冲突，其中绝大多数与零跑毫无关系。
+
+做法是**把被 git 跟踪的文件整体换成上游新版本，再把下面这一小摞重新贴回去**：
+
+1. 五个新增的 `.kt`（`LeapmotorMediaKeys` / `LeapmotorGearMonitor` / `LeapmotorClusterLayout` /
+   `ClusterMapViewport` / `LearnedWheelKeys`）—— 上游没有，直接拷回来即可
+2. 上面三个上游文件的 hunk —— 按本节表格里的语义锚点重新贴
+3. `docs/LEAPMOTOR.md` 与 `scripts/sync-upstream.sh`
+
+### 上游会自己吸收一些本地改动
+
+每贴一次之前，先确认这些改动是否还必要：
+
+| 曾经的本地改动 | 现状 |
+|---|---|
+| 连接提示文案改用 `englishMessage` 匹配 | **v0.2.19 起上游已如此**，本地 hunk 已删除 |
+| 关于页并入 `SettingsCategory.ABOUT` | **v0.2.19 起上游已如此**，本地 hunk 已删除 |
+| `strings.xml` 里 `bluetooth_connections_not_real` 的行序 | 纯排序，与适配无关，不随分支维护 |
+
+### 配件身份不再随源码分发
+
+上游 v0.2.18 起不再把 CarPlay 配件身份打进源码树，改为构建时用 `DIPLAY_AUTH_ASSETS_DIR` 显式注入。
+不注入也能构建，但装到车机会提示「无法加载 CarPlay 认证」。详见上游 `docs/BUILD.md`。
 
 ### 关于 `LearnedWheelKeys`
 
